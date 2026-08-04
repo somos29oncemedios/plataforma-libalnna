@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { supabase } from './supabase';
 
 const ORDEN_CATEGORIAS = ['U8', 'U10', 'U12', 'U14', 'U16 Femenino', 'U16 Masculino', 'U18', 'U20'];
@@ -33,7 +34,7 @@ export default function Home() {
   return (
     <main className="container mx-auto flex flex-col items-center justify-center py-16 px-4">
       
-      {/* Banner Principal sin textos de relleno */}
+      {/* Banner Principal */}
       <div className="flex flex-col items-center mb-16 text-center">
         <div className="mb-6">
           <img 
@@ -44,12 +45,12 @@ export default function Home() {
         </div>
         
         <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto mt-6">
-          <button className="bg-blue-600 text-white px-8 py-3 rounded-md font-bold hover:bg-blue-700 transition-colors shadow-sm">
+          <Link href="/calendario" className="bg-blue-600 text-white px-8 py-3 rounded-md font-bold hover:bg-blue-700 transition-colors shadow-sm text-center">
             Partidos de Hoy
-          </button>
-          <button className="bg-white text-gray-900 border-2 border-gray-900 px-8 py-3 rounded-md font-bold hover:bg-gray-900 hover:text-white transition-colors shadow-sm">
+          </Link>
+          <Link href="/posiciones" className="bg-white text-gray-900 border-2 border-gray-900 px-8 py-3 rounded-md font-bold hover:bg-gray-900 hover:text-white transition-colors shadow-sm text-center">
             Tabla de Posiciones
-          </button>
+          </Link>
         </div>
       </div>
       
@@ -66,45 +67,33 @@ export default function Home() {
             </p>
           ) : (
             equipos.map((equipo) => (
-              <div 
+              <Link 
+                href={`/equipos?id=${equipo.id}`}
                 key={equipo.id} 
-                className="bg-white border border-gray-200 rounded-xl p-6 flex flex-col items-center shadow-sm hover:shadow-md transition duration-300"
+                className="bg-white border border-gray-200 rounded-xl p-6 flex flex-col items-center shadow-sm hover:shadow-lg hover:border-blue-400 transition-all duration-300 cursor-pointer group"
               >
-                
-                {/* Logo del Equipo */}
-                <div className="w-24 h-24 rounded-full flex items-center justify-center bg-gray-100 mb-4 overflow-hidden border-2 border-gray-200">
+                <div className="w-24 h-24 rounded-full flex items-center justify-center bg-gray-100 mb-4 overflow-hidden border-2 border-gray-200 group-hover:scale-105 transition-transform duration-300">
                   {equipo.logo_url ? (
-                    <img 
-                      src={equipo.logo_url} 
-                      alt={`Logo de ${equipo.nombre}`} 
-                      className="w-full h-full object-contain p-2" 
-                    />
+                    <img src={equipo.logo_url} alt={`Logo de ${equipo.nombre}`} className="w-full h-full object-contain p-2" />
                   ) : (
-                    <span className="text-4xl font-black text-gray-400">
+                    <span className="text-4xl font-black text-gray-400 group-hover:text-blue-500 transition-colors">
                       {equipo.nombre.charAt(0).toUpperCase()}
                     </span>
                   )}
                 </div>
-
-                {/* Nombre */}
-                <h3 className="text-lg font-bold text-center text-gray-900 mb-3">
+                <h3 className="text-lg font-bold text-center text-gray-900 mb-3 group-hover:text-blue-600 transition-colors">
                   {equipo.nombre}
                 </h3>
-
-                {/* Categorías Ordenadas */}
                 {equipo.categorias && equipo.categorias.length > 0 && (
                   <div className="flex flex-wrap justify-center gap-2">
                     {ordenarCategorias(equipo.categorias).map((cat: string) => (
-                      <span 
-                        key={cat} 
-                        className="text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-200 px-2 py-1 rounded-full"
-                      >
+                      <span key={cat} className="text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-200 px-2 py-1 rounded-full group-hover:bg-blue-50 group-hover:border-blue-100 group-hover:text-blue-700 transition-colors">
                         {cat}
                       </span>
                     ))}
                   </div>
                 )}
-              </div>
+              </Link>
             ))
           )}
         </div>
