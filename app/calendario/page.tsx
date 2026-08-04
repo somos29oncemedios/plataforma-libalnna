@@ -4,8 +4,8 @@ import { useState, useEffect } from "react";
 import { supabase } from "../supabase"; // Conexión a nuestra base de datos
 
 export default function Calendario() {
-  // 1. Alineamos las categorías con las que registramos en Supabase
-  const categorias = ["U8", "U10", "U12", "U14", "U16 Femenino", "U16 Masculino", "U18", "U20"];
+  // 1. Añadimos "Todas" al inicio de las categorías y la ponemos como activa por defecto
+  const categorias = ["Todas", "U8", "U10", "U12", "U14", "U16 Femenino", "U16 Masculino", "U18", "U20"];
   const [categoriaActiva, setCategoriaActiva] = useState(categorias[0]);
 
   // 2. Estados para manejar los datos reales
@@ -28,6 +28,7 @@ export default function Calendario() {
           local:equipos!equipo_local_id(nombre, logo_url),
           visitante:equipos!equipo_visitante_id(nombre, logo_url)
         `)
+        // Ordenamos cronológicamente: primero por fecha, luego por hora
         .order('fecha', { ascending: true })
         .order('hora', { ascending: true });
 
@@ -40,8 +41,10 @@ export default function Calendario() {
     fetchPartidos();
   }, []);
 
-  // 4. Armador: Filtrar automáticamente los partidos según la pestaña elegida
-  const partidosFiltrados = partidos.filter(partido => partido.categoria === categoriaActiva);
+  // 4. Armador: Filtrar los partidos según la pestaña elegida o mostrarlos todos
+  const partidosFiltrados = categoriaActiva === "Todas" 
+    ? partidos 
+    : partidos.filter(partido => partido.categoria === categoriaActiva);
 
   return (
     <main className="container mx-auto py-12 px-4">
@@ -67,7 +70,8 @@ export default function Calendario() {
                 : "bg-white text-gray-500 hover:bg-gray-100 hover:text-libalnna-dark border border-gray-200"
             }`}
           >
-            Categoría {cat}
+            {/* Si es "Todas", mostramos un texto distinto, si no, "Categoría X" */}
+            {cat === "Todas" ? "Todas las Categorías" : `Categoría ${cat}`}
           </button>
         ))}
       </div>
@@ -76,7 +80,9 @@ export default function Calendario() {
       {cargando ? (
         <div className="text-center py-20 text-xl font-bold text-gray-500">Cargando la cartelera oficial...</div>
       ) : partidosFiltrados.length === 0 ? (
-        <div className="text-center py-20 text-xl font-bold text-gray-500">No hay partidos programados aún para la {categoriaActiva}.</div>
+        <div className="text-center py-20 text-xl font-bold text-gray-500">
+          No hay partidos programados {categoriaActiva !== "Todas" ? `para la Categoría ${categoriaActiva}` : "aún"}.
+        </div>
       ) : (
         <div className="flex flex-col gap-6 max-w-4xl">
           {partidosFiltrados.map((partido) => (
@@ -87,7 +93,8 @@ export default function Calendario() {
                 <span className="font-bold text-libalnna-dark text-sm">{partido.fecha} • {partido.hora}</span>
                 <span className="text-xs font-semibold text-gray-500 flex items-center gap-1 uppercase tracking-wider">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                  {partido.lugar} • {partido.fase_torneo}
+                  {/* Agregamos la categoría aquí para que se vea claro en la lista general */}
+                  {partido.lugar} • <span className="text-libalnna-blue">{partido.categoria}</span> • {partido.fase_torneo}
                 </span>
               </div>
 
@@ -111,6 +118,7 @@ export default function Calendario() {
                   {partido.estado === "finalizado" ? (
                     <>
                       <div className="flex items-center gap-4 md:gap-8">
+                        {/* Nota Táctica: Por ahora los dejamos con un guion vacío, luego los conectaremos a los box_scores */}
                         <span className="text-3xl md:text-5xl font-black text-libalnna-dark">-</span>
                         <span className="text-gray-300 font-black text-xl">-</span>
                         <span className="text-3xl md:text-5xl font-black text-libalnna-dark">-</span>

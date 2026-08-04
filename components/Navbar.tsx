@@ -15,9 +15,11 @@ export default function Navbar() {
         </Link>
         
         {/* Enlaces limpios para el público */}
-        <div className="flex gap-8 font-semibold text-sm tracking-wide">
+        <div className="flex gap-8 font-semibold text-sm tracking-wide items-center">
           <Link href="/" className="hover:text-blue-600 transition-colors">INICIO</Link>
           <Link href="/calendario" className="hover:text-blue-600 transition-colors">PARTIDOS</Link>
+          <Link href="/equipos" className="hover:text-blue-600 transition-colors">EQUIPOS</Link>
+          <Link href="/posiciones" className="hover:text-blue-600 transition-colors">POSICIONES</Link>
         </div>
         
       </div>
