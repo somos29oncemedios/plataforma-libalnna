@@ -14,7 +14,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es">
-      <body className="bg-libalnna-light text-libalnna-dark min-h-screen">
+      {/* Ajuste Móvil: Se agregó pb-20 md:pb-0 para que el contenido respire sobre la App Bar flotante */}
+      <body className="bg-libalnna-light text-libalnna-dark min-h-screen pb-20 md:pb-0">
         <Navbar />
         {children}
       </body>
