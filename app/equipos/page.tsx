@@ -36,7 +36,6 @@ function ListaEquipos() {
         
         let statsMap: any = {};
         if (statsData) {
-          // 🏀 CORRECCIÓN AQUÍ: (stat: any)
           statsData.forEach((stat: any) => {
             if (!statsMap[stat.jugador_id]) {
               statsMap[stat.jugador_id] = { pj: 0, pts: 0, reb: 0, ast: 0, rob: 0, min: 0 };
@@ -60,7 +59,6 @@ function ListaEquipos() {
   useEffect(() => {
     if (equipos.length > 0) {
       if (equipoIdUrl) {
-        // 🏀 CORRECCIÓN AQUÍ: (e: any)
         const equipoSeleccionado = equipos.find((e: any) => e.id.toString() === equipoIdUrl);
         setEquipoActivo(equipoSeleccionado || equipos[0]);
       } else {
@@ -69,63 +67,64 @@ function ListaEquipos() {
     }
   }, [equipos, equipoIdUrl]); 
 
-  // 🏀 CORRECCIÓN AQUÍ: (j: any)
   const rosterActual = jugadores.filter((j: any) => j.equipo_id === equipoActivo?.id);
 
   return (
-    <main className="container mx-auto py-12 px-4 max-w-6xl">
-      <div className="mb-10 text-center md:text-left">
-        <h1 className="text-4xl font-black text-gray-900 uppercase tracking-tight">Equipos y Rosters</h1>
-        <p className="text-gray-500 mt-2 font-medium">Plantillas oficiales y estadísticas individuales</p>
+    <main className="container mx-auto py-8 md:py-12 px-4 max-w-6xl">
+      {/* Encabezado */}
+      <div className="mb-6 md:mb-10 text-center md:text-left">
+        <h1 className="text-3xl md:text-4xl font-black text-gray-900 uppercase tracking-tight">Equipos y Rosters</h1>
+        <p className="text-sm md:text-base text-gray-500 mt-1 md:mt-2 font-medium">Plantillas oficiales y estadísticas individuales</p>
       </div>
 
       {cargando ? (
-        <div className="text-center py-20 text-xl font-bold text-gray-500">Cargando los vestuarios...</div>
+        <div className="text-center py-20 text-lg md:text-xl font-bold text-gray-500">Cargando los vestuarios...</div>
       ) : equipos.length === 0 ? (
-        <div className="text-center py-20 text-xl font-bold text-gray-500">No hay equipos registrados en la liga.</div>
+        <div className="text-center py-20 text-lg md:text-xl font-bold text-gray-500">No hay equipos registrados en la liga.</div>
       ) : (
         <>
-          <div className="flex overflow-x-auto gap-3 mb-10 pb-2 scrollbar-hide">
-            {/* 🏀 CORRECCIÓN AQUÍ: (equipo: any) */}
+          {/* Pestañas de Equipos */}
+          <div className="flex overflow-x-auto gap-2 md:gap-3 mb-8 md:mb-10 pb-2 scrollbar-hide">
             {equipos.map((equipo: any) => (
               <button
                 key={equipo.id}
                 onClick={() => setEquipoActivo(equipo)}
-                className={`flex items-center gap-2 px-6 py-3 rounded-full font-bold text-sm transition-all whitespace-nowrap border-2 ${
+                className={`flex items-center gap-2 px-4 py-2 md:px-6 md:py-3 rounded-full font-bold text-xs md:text-sm transition-all whitespace-nowrap border-2 ${
                   equipoActivo?.id === equipo.id
                     ? "bg-blue-600 text-white border-blue-600 shadow-md"
                     : "bg-white text-gray-600 hover:bg-gray-50 border-gray-200"
                 }`}
               >
                 {equipo.logo_url && (
-                  <img src={equipo.logo_url} alt={equipo.nombre} className="w-5 h-5 object-contain rounded-full bg-white" />
+                  <img src={equipo.logo_url} alt={equipo.nombre} className="w-4 h-4 md:w-5 md:h-5 object-contain rounded-full bg-white" />
                 )}
                 {equipo.nombre}
               </button>
             ))}
           </div>
 
-          <div className="bg-gray-900 rounded-2xl p-8 mb-8 flex flex-col md:flex-row items-center gap-6 shadow-lg">
-            <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center shrink-0 border-4 border-gray-800 p-2">
+          {/* Información del Equipo Seleccionado (Banner) */}
+          <div className="bg-gray-900 rounded-2xl p-6 md:p-8 mb-8 flex flex-col md:flex-row items-center gap-4 md:gap-6 shadow-lg">
+            <div className="w-20 h-20 md:w-24 md:h-24 bg-white rounded-full flex items-center justify-center shrink-0 border-4 border-gray-800 p-2">
               {equipoActivo?.logo_url ? (
                 <img src={equipoActivo.logo_url} alt={equipoActivo.nombre} className="w-full h-full object-contain" />
               ) : (
-                <span className="text-gray-300 font-black text-4xl">{equipoActivo?.nombre.charAt(0)}</span>
+                <span className="text-gray-300 font-black text-3xl md:text-4xl">{equipoActivo?.nombre.charAt(0)}</span>
               )}
             </div>
             <div className="text-center md:text-left text-white">
-              <h2 className="text-3xl font-black uppercase tracking-wide">{equipoActivo?.nombre}</h2>
-              <p className="text-blue-400 font-semibold mt-1">Categorías: {equipoActivo?.categorias?.join(', ') || 'General'}</p>
+              <h2 className="text-2xl md:text-3xl font-black uppercase tracking-wide">{equipoActivo?.nombre}</h2>
+              <p className="text-blue-400 font-semibold text-sm md:text-base mt-1">Categorías: {equipoActivo?.categorias?.join(', ') || 'General'}</p>
             </div>
           </div>
 
+          {/* Tarjetas de Jugadores (Roster) - Ajuste Móvil: grid-cols-2 */}
           {rosterActual.length === 0 ? (
-            <div className="text-center py-16 bg-gray-50 rounded-xl border border-gray-200">
-              <p className="text-gray-500 font-semibold">Este equipo aún no ha fichado jugadores en su plantilla.</p>
+            <div className="text-center py-12 md:py-16 bg-gray-50 rounded-xl border border-gray-200">
+              <p className="text-gray-500 font-semibold text-sm md:text-base">Este equipo aún no ha fichado jugadores en su plantilla.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {/* 🏀 CORRECCIÓN AQUÍ: (jugador: any) */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-6">
               {rosterActual.map((jugador: any) => {
                 const stats = estadisticas[jugador.id] || { pj: 0, pts: 0, reb: 0, ast: 0, rob: 0, min: 0 };
                 const ppp = stats.pj > 0 ? (stats.pts / stats.pj).toFixed(1) : "0.0";
@@ -134,36 +133,40 @@ function ListaEquipos() {
 
                 return (
                   <div key={jugador.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow flex flex-col">
-                    <div className="relative h-48 bg-gray-100 flex items-center justify-center border-b border-gray-200">
+                    
+                    {/* Foto y Número del Jugador */}
+                    <div className="relative h-36 md:h-48 bg-gray-100 flex items-center justify-center border-b border-gray-200">
                       {jugador.foto_url ? (
                         <img src={jugador.foto_url} alt={jugador.nombre} className="w-full h-full object-cover" />
                       ) : (
-                        <span className="text-gray-300 font-black text-6xl">#{jugador.numero}</span>
+                        <span className="text-gray-300 font-black text-4xl md:text-6xl">#{jugador.numero}</span>
                       )}
-                      <div className="absolute bottom-[-16px] right-4 w-10 h-10 bg-blue-600 text-white rounded-lg flex items-center justify-center font-black shadow-sm transform -rotate-3 border-2 border-white">
+                      <div className="absolute bottom-[-12px] md:bottom-[-16px] right-2 md:right-4 w-8 h-8 md:w-10 md:h-10 bg-blue-600 text-white rounded-lg flex items-center justify-center font-black shadow-sm transform -rotate-3 border-2 border-white text-xs md:text-base">
                         {jugador.numero}
                       </div>
                     </div>
                     
-                    <div className="px-5 pt-6 pb-4">
-                      <h3 className="font-black text-gray-900 text-lg uppercase tracking-tight truncate" title={jugador.nombre}>
+                    {/* Datos del Jugador */}
+                    <div className="px-3 md:px-5 pt-4 md:pt-6 pb-3 md:pb-4">
+                      <h3 className="font-black text-gray-900 text-sm md:text-lg uppercase tracking-tight truncate" title={jugador.nombre}>
                         {jugador.nombre}
                       </h3>
-                      <p className="text-xs font-semibold text-gray-500 mt-1">PJ: {stats.pj} • MIN: {stats.min}</p>
+                      <p className="text-[10px] md:text-xs font-semibold text-gray-500 mt-0.5 md:mt-1">PJ: {stats.pj} • MIN: {stats.min}</p>
                     </div>
 
+                    {/* Estadísticas (Promedios) */}
                     <div className="bg-gray-50 grid grid-cols-3 divide-x divide-gray-200 border-t border-gray-100 mt-auto">
-                      <div className="p-3 text-center">
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">PTS</p>
-                        <p className="font-bold text-gray-800">{ppp}</p>
+                      <div className="p-2 md:p-3 text-center">
+                        <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5 md:mb-1">PTS</p>
+                        <p className="font-bold text-gray-800 text-sm md:text-base">{ppp}</p>
                       </div>
-                      <div className="p-3 text-center">
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">REB</p>
-                        <p className="font-bold text-gray-800">{rpp}</p>
+                      <div className="p-2 md:p-3 text-center">
+                        <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5 md:mb-1">REB</p>
+                        <p className="font-bold text-gray-800 text-sm md:text-base">{rpp}</p>
                       </div>
-                      <div className="p-3 text-center">
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">AST</p>
-                        <p className="font-bold text-gray-800">{app}</p>
+                      <div className="p-2 md:p-3 text-center">
+                        <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5 md:mb-1">AST</p>
+                        <p className="font-bold text-gray-800 text-sm md:text-base">{app}</p>
                       </div>
                     </div>
                   </div>
