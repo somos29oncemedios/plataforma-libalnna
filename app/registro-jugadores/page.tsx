@@ -10,7 +10,7 @@ const CATEGORIAS_DISPONIBLES = [
 
 export default function RegistroJugadores() {
   const [equipos, setEquipos] = useState<any[]>([]);
-  const [jugadores, setJugadores] = useState<any[]>([]); // Lista de atletas
+  const [jugadores, setJugadores] = useState<any[]>([]); 
   
   const [nombre, setNombre] = useState('');
   const [numero, setNumero] = useState('');
@@ -19,15 +19,17 @@ export default function RegistroJugadores() {
   const [categoriasSeleccionadas, setCategoriasSeleccionadas] = useState<string[]>([]);
   const [mensaje, setMensaje] = useState('');
 
-  // Estado para saber si estamos en "Modo Edición"
+  // 🏀 NUEVOS ESTADOS PARA LOS FILTROS
+  const [filtroBusqueda, setFiltroBusqueda] = useState('');
+  const [filtroEquipo, setFiltroEquipo] = useState('');
+  const [filtroCategoria, setFiltroCategoria] = useState('');
+
   const [editandoId, setEditandoId] = useState<string | null>(null);
 
   const cargarDatos = async () => {
-    // Buscar Equipos para el select
     const { data: eqData } = await supabase.from('equipos').select('*').order('nombre', { ascending: true });
     if (eqData) setEquipos(eqData);
 
-    // Buscar Jugadores para la lista inferior
     const { data: jugData } = await supabase
       .from('jugadores')
       .select('*, equipo:equipos!equipo_id(nombre)')
@@ -70,7 +72,6 @@ export default function RegistroJugadores() {
     };
 
     if (editandoId) {
-      // 🏀 UPDATE
       const { error } = await supabase.from('jugadores').update(datosJugador).eq('id', editandoId);
       if (error) setMensaje(`❌ Error al actualizar: ${error.message}`);
       else {
@@ -79,7 +80,6 @@ export default function RegistroJugadores() {
         cargarDatos();
       }
     } else {
-      // 🏀 INSERT
       const { error } = await supabase.from('jugadores').insert([datosJugador]);
       if (error) setMensaje(`❌ Error en el fichaje: ${error.message}`);
       else {
@@ -124,6 +124,16 @@ export default function RegistroJugadores() {
     setEditandoId(null);
     if (mensaje.includes('Modo edición')) setMensaje('');
   };
+
+  // 🏀 LÓGICA DE FILTRADO EN TIEMPO REAL
+  const jugadoresFiltrados = jugadores.filter((jugador) => {
+    const coincideBusqueda = jugador.nombre.toLowerCase().includes(filtroBusqueda.toLowerCase()) || 
+                             jugador.numero.toString().includes(filtroBusqueda);
+    const coincideEquipo = filtroEquipo === '' || jugador.equipo_id.toString() === filtroEquipo;
+    const coincideCategoria = filtroCategoria === '' || (jugador.categorias && jugador.categorias.includes(filtroCategoria));
+    
+    return coincideBusqueda && coincideEquipo && coincideCategoria;
+  });
 
   return (
     <main className="container mx-auto px-4 py-16 max-w-4xl">
@@ -195,15 +205,55 @@ export default function RegistroJugadores() {
         )}
       </div>
 
-      {/* LISTA DE JUGADORES PARA EDITAR Y ELIMINAR */}
+      {/* LISTA DE JUGADORES Y FILTROS */}
       <div className="bg-white border border-gray-200 shadow-sm rounded-xl p-8">
         <h2 className="text-2xl font-bold mb-6 text-gray-800 border-b pb-4">Atletas Fichados</h2>
         
+        {/* 🏀 PANEL DE FILTROS */}
+        <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-6 flex flex-col md:flex-row gap-4">
+          <div className="flex-1">
+            <input 
+              type="text" 
+              placeholder="🔍 Buscar por nombre o número..." 
+              value={filtroBusqueda}
+              onChange={(e) => setFiltroBusqueda(e.target.value)}
+              className="w-full border border-gray-300 p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" 
+            />
+          </div>
+          <div className="md:w-1/4">
+            <select 
+              value={filtroEquipo} 
+              onChange={(e) => setFiltroEquipo(e.target.value)}
+              className="w-full border border-gray-300 p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            >
+              <option value="">Todos los Clubes</option>
+              {equipos.map(equipo => (
+                <option key={equipo.id} value={equipo.id}>{equipo.nombre}</option>
+              ))}
+            </select>
+          </div>
+          <div className="md:w-1/4">
+            <select 
+              value={filtroCategoria} 
+              onChange={(e) => setFiltroCategoria(e.target.value)}
+              className="w-full border border-gray-300 p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            >
+              <option value="">Todas las Categorías</option>
+              {CATEGORIAS_DISPONIBLES.map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        
+        {/* RENDERIZADO DE LA LISTA FILTRADA */}
         {jugadores.length === 0 ? (
           <p className="text-gray-500 italic text-center py-6">No hay jugadores registrados en la base de datos.</p>
+        ) : jugadoresFiltrados.length === 0 ? (
+          <p className="text-gray-500 italic text-center py-6">No se encontraron atletas con esos filtros.</p>
         ) : (
           <div className="grid gap-4">
-            {jugadores.map(jugador => (
+            {jugadoresFiltrados.map(jugador => (
               <div key={jugador.id} className="flex flex-col md:flex-row justify-between items-center p-4 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors">
                 <div className="flex items-center gap-4 mb-4 md:mb-0 w-full md:w-auto">
                   <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center shrink-0 overflow-hidden border border-gray-300">

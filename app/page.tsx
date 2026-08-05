@@ -36,16 +36,37 @@ export default function Home() {
       
       {/* Banner Principal */}
       <div className="flex flex-col items-center mb-12 md:mb-16 text-center w-full">
-        <div className="mb-6 md:mb-8">
+        
+        {/* Logo de la Liga */}
+        <div className="mb-4 md:mb-6">
           <img 
             src="/logo-libalnna.png" 
             alt="Logo Libalnna" 
             className="h-28 md:h-40 w-auto object-contain mx-auto" 
           />
         </div>
+
+        {/* 🏀 NUEVA JUGADA: Sección de Patrocinantes Oficiales */}
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 md:gap-6 mb-6 md:mb-8 bg-gray-50 px-6 py-3 rounded-2xl border border-gray-100">
+          <span className="text-[10px] md:text-xs font-black text-gray-400 uppercase tracking-widest">
+            Presentado por:
+          </span>
+          <div className="flex items-center gap-6">
+            <img 
+              src="/logo-yesdan.png" 
+              alt="Sponsor Yesdan" 
+              className="h-6 md:h-8 w-auto object-contain grayscale hover:grayscale-0 transition-all duration-300 opacity-80 hover:opacity-100"
+            />
+            <img 
+              src="/logo-29once.png" 
+              alt="Sponsor 29once" 
+              className="h-6 md:h-8 w-auto object-contain grayscale hover:grayscale-0 transition-all duration-300 opacity-80 hover:opacity-100"
+            />
+          </div>
+        </div>
         
-        {/* Ajuste Móvil: flex-col y w-full para que los botones sean fáciles de tocar en celulares */}
-        <div className="flex flex-col sm:flex-row gap-3 md:gap-4 w-full sm:w-auto mt-2 md:mt-6">
+        {/* Botones Principales (Mobile First) */}
+        <div className="flex flex-col sm:flex-row gap-3 md:gap-4 w-full sm:w-auto mt-2 md:mt-4">
           <Link href="/calendario" className="w-full sm:w-auto bg-blue-600 text-white px-8 py-3.5 md:py-4 rounded-xl font-black uppercase tracking-wide hover:bg-blue-700 transition-colors shadow-lg text-center text-sm md:text-base">
             Partidos de Hoy
           </Link>
@@ -61,7 +82,7 @@ export default function Home() {
           Equipos <span className="text-blue-600">Oficiales</span>
         </h2>
 
-        {/* Ajuste Móvil: grid-cols-2 por defecto, creciendo a 3 y 4 en pantallas más grandes */}
+        {/* Cuadrícula de Equipos */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
           {equipos.length === 0 ? (
             <p className="text-gray-500 col-span-full text-center py-10 font-medium">
@@ -74,8 +95,7 @@ export default function Home() {
                 key={equipo.id} 
                 className="bg-white border border-gray-200 rounded-2xl p-4 md:p-6 flex flex-col items-center shadow-sm hover:shadow-xl hover:border-blue-400 transition-all duration-300 cursor-pointer group"
               >
-                
-                {/* Logo del Equipo (Escalado para móviles) */}
+                {/* Logo del Equipo */}
                 <div className="w-20 h-20 md:w-28 md:h-28 rounded-full flex items-center justify-center bg-gray-50 mb-3 md:mb-4 overflow-hidden border-2 border-gray-100 group-hover:scale-105 transition-transform duration-300 shadow-sm">
                   {equipo.logo_url ? (
                     <img 
@@ -95,7 +115,7 @@ export default function Home() {
                   {equipo.nombre}
                 </h3>
 
-                {/* Categorías Ordenadas (Etiquetas más compactas en móviles) */}
+                {/* Categorías Ordenadas */}
                 {equipo.categorias && equipo.categorias.length > 0 && (
                   <div className="flex flex-wrap justify-center gap-1.5 md:gap-2">
                     {ordenarCategorias(equipo.categorias).map((cat: string) => (
