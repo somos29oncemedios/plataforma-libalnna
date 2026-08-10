@@ -203,21 +203,7 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
     }
   };
 
-  const finalizarPartido = async () => {
-    const confirmar = window.confirm("🛑 ¿Estás seguro de pitar el final del partido? Se calcularán las posiciones y se bloqueará el marcador.");
-    if (!confirmar) return;
-
-    const { error } = await supabase
-      .from('partidos')
-      .update({ estado: 'finalizado' })
-      .eq('id', id);
-
-    if (!error) {
-      alert('✅ ¡Partido finalizado con éxito!');
-      setPartido({ ...partido, estado: 'finalizado' });
-    }
-  };
-
+  // 🏀 CÁLCULO PREVIO PARA LOS PUNTOS TOTALES
   let scoreJugadoresLocal = 0;
   let scoreJugadoresVisitante = 0;
   
@@ -228,6 +214,28 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
 
   const scoreLocal = Math.max(0, scoreJugadoresLocal + (partido?.score_manual_local || 0));
   const scoreVisitante = Math.max(0, scoreJugadoresVisitante + (partido?.score_manual_visitante || 0));
+
+  // 🏀 FUNCIÓN ACTUALIZADA: GUARDA EL ESTADO Y EL SCORE FINAL EN LA TABLA PARTIDOS
+  const finalizarPartido = async () => {
+    const confirmar = window.confirm("🛑 ¿Estás seguro de pitar el final del partido? Se guardará el marcador definitivo y se bloqueará el panel.");
+    if (!confirmar) return;
+
+    const { error } = await supabase
+      .from('partidos')
+      .update({ 
+        estado: 'finalizado',
+        puntos_local: scoreLocal,
+        puntos_visitante: scoreVisitante
+      })
+      .eq('id', id);
+
+    if (!error) {
+      alert('✅ ¡Partido finalizado y marcador guardado con éxito!');
+      setPartido({ ...partido, estado: 'finalizado' });
+    } else {
+      alert(`❌ Error al finalizar el partido: ${error.message}`);
+    }
+  };
 
   if (cargando) return <div className="text-center py-20 font-bold text-gray-500">Preparando la Mesa Técnica...</div>;
 
