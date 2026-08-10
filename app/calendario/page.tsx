@@ -12,6 +12,7 @@ export default function Calendario() {
 
   useEffect(() => {
     const fetchPartidos = async () => {
+      // 🏀 Incluimos puntos_local y puntos_visitante en la consulta
       const { data, error } = await supabase
         .from('partidos')
         .select(`
@@ -22,6 +23,8 @@ export default function Calendario() {
           fase_torneo,
           lugar,
           categoria,
+          puntos_local,
+          puntos_visitante,
           local:equipos!equipo_local_id(nombre, logo_url),
           visitante:equipos!equipo_visitante_id(nombre, logo_url)
         `)
@@ -65,7 +68,6 @@ export default function Calendario() {
       {/* Encabezado */}
       <div className="mb-6 md:mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4 text-center md:text-left">
         <div>
-          {/* Ajuste Móvil: text-2xl en celulares */}
           <h1 className="text-2xl md:text-3xl font-black text-gray-900 uppercase tracking-tight">
             Calendario de Juegos
           </h1>
@@ -116,7 +118,7 @@ export default function Calendario() {
               {/* Cuerpo del partido (Equipos y Marcador) */}
               <div className="px-3 py-6 md:px-6 md:py-8 flex flex-row items-center justify-between md:justify-center md:gap-16">
                 
-                {/* Equipo Local (Ajuste: w-[35%] y line-clamp para evitar deformaciones) */}
+                {/* Equipo Local */}
                 <div className="flex flex-col items-center gap-2 md:gap-3 w-[35%] md:w-auto">
                   <div className="w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 bg-gray-50 rounded-full flex items-center justify-center border-2 border-gray-100 shrink-0">
                     {partido.local?.logo_url ? (
@@ -128,14 +130,14 @@ export default function Calendario() {
                   <span className="font-bold text-gray-900 text-[11px] sm:text-sm md:text-base text-center uppercase leading-tight line-clamp-2 md:line-clamp-none">{partido.local?.nombre || 'Local'}</span>
                 </div>
 
-                {/* Marcador Central (Ajuste: w-[30%] y textos más pequeños en móviles) */}
+                {/* Marcador Central Dinámico */}
                 <div className="flex flex-col items-center justify-center w-[30%] md:w-auto">
                   {partido.estado === "finalizado" ? (
                     <>
-                      <div className="flex items-center gap-2 md:gap-8">
-                        <span className="text-2xl sm:text-3xl md:text-5xl font-black text-gray-900">-</span>
+                      <div className="flex items-center gap-2 md:gap-6">
+                        <span className="text-2xl sm:text-3xl md:text-5xl font-black text-gray-900">{partido.puntos_local ?? 0}</span>
                         <span className="text-gray-300 font-black text-lg md:text-xl">-</span>
-                        <span className="text-2xl sm:text-3xl md:text-5xl font-black text-gray-900">-</span>
+                        <span className="text-2xl sm:text-3xl md:text-5xl font-black text-gray-900">{partido.puntos_visitante ?? 0}</span>
                       </div>
                       <span className="mt-1 md:mt-2 text-[9px] md:text-xs font-bold text-gray-400 bg-gray-50 px-2 py-1 md:px-3 rounded-full border border-gray-100 text-center leading-none">FINALIZADO</span>
                     </>
@@ -152,7 +154,7 @@ export default function Calendario() {
                   )}
                 </div>
 
-                {/* Equipo Visitante (Ajuste: w-[35%] y line-clamp) */}
+                {/* Equipo Visitante */}
                 <div className="flex flex-col items-center gap-2 md:gap-3 w-[35%] md:w-auto">
                   <div className="w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 bg-gray-50 rounded-full flex items-center justify-center border-2 border-gray-100 shrink-0">
                     {partido.visitante?.logo_url ? (
