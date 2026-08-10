@@ -12,11 +12,10 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
   const [estadisticas, setEstadisticas] = useState<any>({});
   const [cargando, setCargando] = useState(true);
   
-  // 🏀 NUEVO: Estado para permitir editar un partido ya finalizado temporalmente
+  // Estado para permitir editar un partido ya finalizado temporalmente
   const [editandoDespuesDeFinalizar, setEditandoDespuesDeFinalizar] = useState(false);
 
   const cargarPartido = async () => {
-    // 1. Obtener detalles del partido
     const { data: partidoData } = await supabase
       .from('partidos')
       .select('*, local:equipos!equipo_local_id(nombre, logo_url), visitante:equipos!equipo_visitante_id(nombre, logo_url)')
@@ -26,7 +25,6 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
     if (partidoData) {
       setPartido(partidoData);
 
-      // 2. Obtener plantillas
       const { data: jugadoresData } = await supabase
         .from('jugadores')
         .select('*')
@@ -38,7 +36,6 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
         setRosterVisitante(jugadoresData.filter((j: any) => j.equipo_id === partidoData.equipo_visitante_id));
       }
 
-      // 3. Obtener estadísticas actuales (box_scores)
       const { data: statsData } = await supabase
         .from('box_scores')
         .select('*')
@@ -59,10 +56,9 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
     cargarPartido();
   }, [id]);
 
-  // Bloqueo estricto solo si el partido está finalizado Y NO se ha activado la edición manual
   const partidoBloqueado = partido?.estado === 'finalizado' && !editandoDespuesDeFinalizar;
 
-  // 🏀 FUNCIÓN MAESTRA BLINDADA
+  // 🏀 FUNCIÓN MAESTRA CON SINCRONIZACIÓN AUTOMÁTICA EN TIEMPO REAL
   const anotarEstadistica = async (jugadorId: string, equipoId: string, tipo: 'tl' | 'd2' | 't3', operacion: 'sumar' | 'restar') => {
     if (partidoBloqueado) {
       alert('El partido ya ha finalizado. Habilita la edición si necesitas hacer correcciones.');
@@ -82,7 +78,6 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
     let nuevosTL = statsActuales.tiros_libres_anotados || 0;
     let nuevosTriples = statsActuales.triples_anotados || 0;
 
-    // Lógica Matemática
     if (tipo === 'tl') {
       if (operacion === 'sumar') {
         nuevosPuntos += 1;
@@ -151,31 +146,35 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
 
         error = res.error;
         if (!error && res.data) {
-          setEstadisticas((prev: any) => ({
-            ...prev,
+          const nuevasEstatsMap = {
+            ...estadisticas,
             [jugadorId]: res.data
-          }));
+          };
+          setEstadisticas(nuevasEstatsMap);
+          sincronizarPuntosGlobales(nuevasEstatsMap, partido?.score_manual_local || 0, partido?.score_manual_visitante || 0);
           return;
         }
       }
     }
 
     if (!error) {
-      setEstadisticas((prev: any) => ({
-        ...prev,
+      const nuevasEstatsMap = {
+        ...estadisticas,
         [jugadorId]: {
-          ...(prev[jugadorId] || { partido_id: id, jugador_id: jugadorId, equipo_id: equipoId }),
+          ...(estadisticas[jugadorId] || { partido_id: id, jugador_id: jugadorId, equipo_id: equipoId }),
           ...datosActualizados,
-          id: registroExistente?.id || prev[jugadorId]?.id
+          id: registroExistente?.id || estadisticas[jugadorId]?.id
         }
-      }));
+      };
+      setEstadisticas(nuevasEstatsMap);
+      sincronizarPuntosGlobales(nuevasEstatsMap, partido?.score_manual_local || 0, partido?.score_manual_visitante || 0);
     } else {
       console.error("Error al actualizar marcador:", error);
-      alert(`❌ Error técnico de Supabase: ${error.message} (Código: ${error.code})`);
+      alert(`❌ Error técnico de Supabase: ${error.message}`);
     }
   };
 
-  // 🏀 AJUSTE MANUAL DEL MARCADOR GLOBAL
+  // 🏀 AJUSTE MANUAL DEL MARCADOR GLOBAL CON SINCRONIZACIÓN
   const ajustarScoreManual = async (equipo: 'local' | 'visitante', operacion: 'sumar' | 'restar') => {
     if (partidoBloqueado) return;
 
@@ -183,16 +182,60 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
     let valorActual = partido[campo] || 0;
     let nuevoValor = operacion === 'sumar' ? valorActual + 1 : Math.max(0, valorActual - 1);
 
+    const manualLocal = equipo === 'local' ? nuevoValor : (partido?.score_manual_local || 0);
+    const manualVis = equipo === 'visitante' ? nuevoValor : (partido?.score_manual_visitante || 0);
+
+    let sLocal = 0;
+    let sVis = 0;
+    Object.values(estadisticas).forEach((stat: any) => {
+      if (stat.equipo_id === partido?.equipo_local_id) sLocal += (stat.puntos_totales || 0);
+      if (stat.equipo_id === partido?.equipo_visitante_id) sVis += (stat.puntos_totales || 0);
+    });
+
+    const finalSLocal = Math.max(0, sLocal + manualLocal);
+    const finalSVis = Math.max(0, sVis + manualVis);
+
     const { error } = await supabase
       .from('partidos')
-      .update({ [campo]: nuevoValor })
+      .update({ 
+        [campo]: nuevoValor,
+        puntos_local: finalSLocal,
+        puntos_visitante: finalSVis
+      })
       .eq('id', id);
 
     if (!error) {
-      setPartido({ ...partido, [campo]: nuevoValor });
+      setPartido({ 
+        ...partido, 
+        [campo]: nuevoValor,
+        puntos_local: finalSLocal,
+        puntos_visitante: finalSVis
+      });
     } else {
       alert(`❌ Error al ajustar score: ${error.message}`);
     }
+  };
+
+  // 🏀 FUNCIÓN PARA GUARDAR Y SINCRONIZAR AUTOMÁTICAMENTE EN LA TABLA PARTIDOS
+  const sincronizarPuntosGlobales = async (currentStats: any, manualLocal: number, manualVis: number) => {
+    let sLocal = 0;
+    let sVis = 0;
+    
+    Object.values(currentStats).forEach((stat: any) => {
+      if (stat.equipo_id === partido?.equipo_local_id) sLocal += (stat.puntos_totales || 0);
+      if (stat.equipo_id === partido?.equipo_visitante_id) sVis += (stat.puntos_totales || 0);
+    });
+
+    const finalSLocal = Math.max(0, sLocal + manualLocal);
+    const finalSVis = Math.max(0, sVis + manualVis);
+
+    await supabase
+      .from('partidos')
+      .update({ 
+        puntos_local: finalSLocal,
+        puntos_visitante: finalSVis
+      })
+      .eq('id', id);
   };
 
   // 🏀 CAMBIAR PERÍODO/CUARTO
@@ -209,7 +252,7 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
     }
   };
 
-  // 🏀 CÁLCULO PREVIO PARA LOS PUNTOS TOTALES
+  // 🏀 CÁLCULO VISUAL EN VIVO
   let scoreJugadoresLocal = 0;
   let scoreJugadoresVisitante = 0;
   
@@ -221,24 +264,22 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
   const scoreLocal = Math.max(0, scoreJugadoresLocal + (partido?.score_manual_local || 0));
   const scoreVisitante = Math.max(0, scoreJugadoresVisitante + (partido?.score_manual_visitante || 0));
 
-  // 🏀 FINALIZAR O ACTUALIZAR PARTIDO
+  // 🏀 FINALIZAR O GUARDAR CAMBIOS
   const finalizarPartido = async () => {
     const confirmar = window.confirm("🛑 ¿Estás seguro de guardar el marcador definitivo y cerrar el panel del partido?");
     if (!confirmar) return;
 
+    await sincronizarPuntosGlobales(estadisticas, partido?.score_manual_local || 0, partido?.score_manual_visitante || 0);
+
     const { error } = await supabase
       .from('partidos')
-      .update({ 
-        estado: 'finalizado',
-        puntos_local: scoreLocal,
-        puntos_visitante: scoreVisitante
-      })
+      .update({ estado: 'finalizado' })
       .eq('id', id);
 
     if (!error) {
       alert('✅ ¡Partido finalizado y marcador guardado con éxito!');
       setPartido({ ...partido, estado: 'finalizado' });
-      setEditandoDespuesDeFinalizar(false); // Volvemos a bloquear por seguridad
+      setEditandoDespuesDeFinalizar(false);
     } else {
       alert(`❌ Error al finalizar el partido: ${error.message}`);
     }
@@ -297,12 +338,12 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
   return (
     <main className="container mx-auto py-8 px-4 max-w-6xl">
       
-      {/* 🏀 AVISO DE EDICIÓN ACTIVA SI EL PARTIDO ESTÁ FINALIZADO */}
+      {/* AVISO DE EDICIÓN ACTIVA */}
       {partido?.estado === 'finalizado' && (
         <div className={`p-4 rounded-2xl mb-6 text-center font-bold flex flex-col sm:flex-row justify-between items-center gap-4 border ${editandoDespuesDeFinalizar ? 'bg-amber-50 text-amber-800 border-amber-300' : 'bg-red-50 text-red-800 border-red-200'}`}>
           <span>
             {editandoDespuesDeFinalizar 
-              ? '⚠️ MODO DE CORRECCIÓN ACTIVO: Puedes modificar puntos o estadísticas. No olvides volver a pitar final para guardar cambios.' 
+              ? '⚠️ MODO DE CORRECCIÓN ACTIVO: Los cambios se actualizan automáticamente en la vista de partidos.' 
               : '🛑 Este partido ha finalizado y se encuentra bloqueado.'}
           </span>
           <button 
@@ -376,11 +417,11 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
         </div>
       </div>
 
-      {/* BOTÓN PITAR FINAL O ACTUALIZAR */}
+      {/* BOTÓN FINALIZAR */}
       {(!partidoBloqueado || editandoDespuesDeFinalizar) && (
         <div className="flex justify-center mb-8">
           <button onClick={finalizarPartido} className="bg-red-600 hover:bg-red-700 text-white font-black px-8 py-3 rounded-xl shadow-md transition-colors uppercase tracking-wide">
-            🛑 {partido?.estado === 'finalizado' ? 'Guardar Cambios y Volver a Finalizar' : 'Pitar Final del Partido'}
+            🛑 {partido?.estado === 'finalizado' ? 'Guardar Cambios y Cerrar Edición' : 'Pitar Final del Partido'}
           </button>
         </div>
       )}
