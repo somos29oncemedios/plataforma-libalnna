@@ -11,6 +11,9 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
   const [rosterVisitante, setRosterVisitante] = useState<any[]>([]);
   const [estadisticas, setEstadisticas] = useState<any>({});
   const [cargando, setCargando] = useState(true);
+  
+  // 🏀 NUEVO: Estado para permitir editar un partido ya finalizado temporalmente
+  const [editandoDespuesDeFinalizar, setEditandoDespuesDeFinalizar] = useState(false);
 
   const cargarPartido = async () => {
     // 1. Obtener detalles del partido
@@ -56,10 +59,13 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
     cargarPartido();
   }, [id]);
 
+  // Bloqueo estricto solo si el partido está finalizado Y NO se ha activado la edición manual
+  const partidoBloqueado = partido?.estado === 'finalizado' && !editandoDespuesDeFinalizar;
+
   // 🏀 FUNCIÓN MAESTRA BLINDADA
   const anotarEstadistica = async (jugadorId: string, equipoId: string, tipo: 'tl' | 'd2' | 't3', operacion: 'sumar' | 'restar') => {
-    if (partido?.estado === 'finalizado') {
-      alert('El partido ya ha finalizado. No se pueden modificar las estadísticas.');
+    if (partidoBloqueado) {
+      alert('El partido ya ha finalizado. Habilita la edición si necesitas hacer correcciones.');
       return;
     }
 
@@ -171,7 +177,7 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
 
   // 🏀 AJUSTE MANUAL DEL MARCADOR GLOBAL
   const ajustarScoreManual = async (equipo: 'local' | 'visitante', operacion: 'sumar' | 'restar') => {
-    if (partido?.estado === 'finalizado') return;
+    if (partidoBloqueado) return;
 
     const campo = equipo === 'local' ? 'score_manual_local' : 'score_manual_visitante';
     let valorActual = partido[campo] || 0;
@@ -191,7 +197,7 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
 
   // 🏀 CAMBIAR PERÍODO/CUARTO
   const cambiarPeriodo = async (nuevoPeriodo: string) => {
-    if (partido?.estado === 'finalizado') return;
+    if (partidoBloqueado) return;
 
     const { error } = await supabase
       .from('partidos')
@@ -215,9 +221,9 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
   const scoreLocal = Math.max(0, scoreJugadoresLocal + (partido?.score_manual_local || 0));
   const scoreVisitante = Math.max(0, scoreJugadoresVisitante + (partido?.score_manual_visitante || 0));
 
-  // 🏀 FUNCIÓN ACTUALIZADA: GUARDA EL ESTADO Y EL SCORE FINAL EN LA TABLA PARTIDOS
+  // 🏀 FINALIZAR O ACTUALIZAR PARTIDO
   const finalizarPartido = async () => {
-    const confirmar = window.confirm("🛑 ¿Estás seguro de pitar el final del partido? Se guardará el marcador definitivo y se bloqueará el panel.");
+    const confirmar = window.confirm("🛑 ¿Estás seguro de guardar el marcador definitivo y cerrar el panel del partido?");
     if (!confirmar) return;
 
     const { error } = await supabase
@@ -232,6 +238,7 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
     if (!error) {
       alert('✅ ¡Partido finalizado y marcador guardado con éxito!');
       setPartido({ ...partido, estado: 'finalizado' });
+      setEditandoDespuesDeFinalizar(false); // Volvemos a bloquear por seguridad
     } else {
       alert(`❌ Error al finalizar el partido: ${error.message}`);
     }
@@ -290,6 +297,23 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
   return (
     <main className="container mx-auto py-8 px-4 max-w-6xl">
       
+      {/* 🏀 AVISO DE EDICIÓN ACTIVA SI EL PARTIDO ESTÁ FINALIZADO */}
+      {partido?.estado === 'finalizado' && (
+        <div className={`p-4 rounded-2xl mb-6 text-center font-bold flex flex-col sm:flex-row justify-between items-center gap-4 border ${editandoDespuesDeFinalizar ? 'bg-amber-50 text-amber-800 border-amber-300' : 'bg-red-50 text-red-800 border-red-200'}`}>
+          <span>
+            {editandoDespuesDeFinalizar 
+              ? '⚠️ MODO DE CORRECCIÓN ACTIVO: Puedes modificar puntos o estadísticas. No olvides volver a pitar final para guardar cambios.' 
+              : '🛑 Este partido ha finalizado y se encuentra bloqueado.'}
+          </span>
+          <button 
+            onClick={() => setEditandoDespuesDeFinalizar(!editandoDespuesDeFinalizar)} 
+            className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-colors shadow-sm ${editandoDespuesDeFinalizar ? 'bg-amber-600 text-white hover:bg-amber-700' : 'bg-gray-800 text-white hover:bg-gray-900'}`}
+          >
+            {editandoDespuesDeFinalizar ? '🔒 Bloquear Panel' : '🔓 Habilitar Edición'}
+          </button>
+        </div>
+      )}
+
       {/* CONTROLES DE CUARTOS */}
       <div className="bg-white rounded-2xl p-4 mb-6 shadow-sm border border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4">
         <div className="font-black text-gray-800 uppercase tracking-wide">
@@ -334,8 +358,8 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
             <span className="text-2xl text-gray-500">-</span>
             <span className="text-5xl md:text-6xl font-black text-yellow-400">{scoreVisitante}</span>
           </div>
-          <span className={`mt-3 px-4 py-1 rounded-full text-xs font-bold uppercase tracking-wider border ${partido?.estado === 'finalizado' ? 'bg-red-900/50 text-red-400 border-red-800' : 'bg-green-900/50 text-green-400 border-green-800'}`}>
-            {partido?.estado === 'finalizado' ? 'FINALIZADO' : 'EN VIVO'}
+          <span className={`mt-3 px-4 py-1 rounded-full text-xs font-bold uppercase tracking-wider border ${partido?.estado === 'finalizado' && !editandoDespuesDeFinalizar ? 'bg-red-900/50 text-red-400 border-red-800' : 'bg-green-900/50 text-green-400 border-green-800'}`}>
+            {partido?.estado === 'finalizado' && !editandoDespuesDeFinalizar ? 'FINALIZADO' : 'EN VIVO / EDITANDO'}
           </span>
         </div>
 
@@ -352,10 +376,11 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
         </div>
       </div>
 
-      {partido?.estado !== 'finalizado' && (
+      {/* BOTÓN PITAR FINAL O ACTUALIZAR */}
+      {(!partidoBloqueado || editandoDespuesDeFinalizar) && (
         <div className="flex justify-center mb-8">
           <button onClick={finalizarPartido} className="bg-red-600 hover:bg-red-700 text-white font-black px-8 py-3 rounded-xl shadow-md transition-colors uppercase tracking-wide">
-            🛑 Pitar Final del Partido
+            🛑 {partido?.estado === 'finalizado' ? 'Guardar Cambios y Volver a Finalizar' : 'Pitar Final del Partido'}
           </button>
         </div>
       )}
