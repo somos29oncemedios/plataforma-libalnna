@@ -13,28 +13,19 @@ export default function TablaPosiciones() {
     const calcularPosiciones = async () => {
       setCargando(true);
       
+      // 1. Obtener todos los equipos de la categoría activa
       const { data: equiposData } = await supabase.from('equipos').select('*');
       
       const equiposFiltrados = equiposData?.filter(eq => 
         eq.categorias && eq.categorias.includes(categoriaActiva)
       ) || [];
 
+      // 2. Obtener todos los partidos finalizados de esta categoría
       const { data: partidos } = await supabase
         .from('partidos')
         .select('*')
         .eq('categoria', categoriaActiva)
         .eq('estado', 'finalizado');
-
-      const partidoIds = partidos?.map(p => p.id) || [];
-      let boxScores: any[] = [];
-      
-      if (partidoIds.length > 0) {
-        const { data } = await supabase
-          .from('box_scores')
-          .select('partido_id, equipo_id, puntos_totales')
-          .in('partido_id', partidoIds);
-        if (data) boxScores = data;
-      }
 
       let stats: any = {};
       equiposFiltrados.forEach(eq => {
@@ -51,20 +42,17 @@ export default function TablaPosiciones() {
         };
       });
 
-      if (partidos && boxScores) {
+      // 3. Procesar resultados usando directamente puntos_local y puntos_visitante de la tabla partidos
+      if (partidos) {
         partidos.forEach(partido => {
-          let ptsLocal = 0;
-          let ptsVisitante = 0;
+          const localId = partido.equipo_local_id;
+          const visitanteId = partido.equipo_visitante_id;
 
-          boxScores.forEach(bx => {
-            if (bx.partido_id === partido.id) {
-              if (bx.equipo_id === partido.equipo_local_id) ptsLocal += bx.puntos_totales;
-              if (bx.equipo_id === partido.equipo_visitante_id) ptsVisitante += bx.puntos_totales;
-            }
-          });
+          const ptsLocal = partido.puntos_local || 0;
+          const ptsVisitante = partido.puntos_visitante || 0;
 
-          const local = stats[partido.equipo_local_id];
-          const visitante = stats[partido.equipo_visitante_id];
+          const local = stats[localId];
+          const visitante = stats[visitanteId];
 
           if (local && visitante) {
             local.pj += 1;
@@ -76,23 +64,31 @@ export default function TablaPosiciones() {
 
             if (ptsLocal > ptsVisitante) {
               local.jg += 1;
-              local.pts += 2;
+              local.pts += 2; // 2 puntos por victoria
               visitante.jp += 1;
-              visitante.pts += 1;
+              visitante.pts += 1; // 1 punto por derrota
             } else if (ptsVisitante > ptsLocal) {
               visitante.jg += 1;
               visitante.pts += 2;
               local.jp += 1;
               local.pts += 1;
+            } else {
+              // En caso de empate (si aplica en alguna categoría formativa)
+              local.pts += 1;
+              visitante.pts += 1;
             }
           }
         });
       }
 
+      // 4. Ordenar la tabla: Primero por Puntos (PTS), luego por Diferencia de Puntos (DIF) y Puntos a Favor (PF)
       const tabla = Object.values(stats)
         .sort((a: any, b: any) => {
           if (b.pts !== a.pts) return b.pts - a.pts; 
-          return (b.pf - b.pc) - (a.pf - a.pc);     
+          const difA = a.pf - a.pc;
+          const difB = b.pf - b.pc;
+          if (difB !== difA) return difB - difA;
+          return b.pf - a.pf;
         });
 
       setPosiciones(tabla);
@@ -105,12 +101,11 @@ export default function TablaPosiciones() {
   return (
     <main className="container mx-auto py-8 md:py-12 px-4 max-w-5xl">
       <div className="mb-6 md:mb-8 text-center md:text-left">
-        {/* Ajuste Móvil: Título ligeramente más pequeño en celulares (text-2xl) */}
         <h1 className="text-2xl md:text-3xl font-black text-gray-900 uppercase tracking-tight">Tabla de Posiciones</h1>
         <p className="text-sm md:text-base text-gray-500 mt-1 font-medium">Clasificación General Oficial - Libalnna</p>
       </div>
 
-      {/* Selector de Categorías (Pestañas) - Ya estaba perfecto para móviles */}
+      {/* Selector de Categorías (Pestañas) */}
       <div className="flex overflow-x-auto gap-2 mb-8 pb-2 scrollbar-hide">
         {categorias.map((cat) => (
           <button
@@ -129,9 +124,7 @@ export default function TablaPosiciones() {
 
       {/* Diseño de la Tabla de Posiciones */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        {/* Contenedor de Scroll Horizontal */}
         <div className="overflow-x-auto">
-          {/* Ajuste Móvil: min-w-[750px] evita que las columnas se aplasten en pantallas pequeñas */}
           <table className="w-full min-w-[750px] text-left border-collapse">
             <thead>
               <tr className="bg-gray-50 text-gray-500 text-[11px] md:text-xs uppercase tracking-wider border-b border-gray-200">
@@ -153,7 +146,7 @@ export default function TablaPosiciones() {
                 </tr>
               ) : posiciones.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="text-center py-12 text-gray-500 font-bold text-sm">No hay equipos registrados en esta categoría.</td>
+                  <td colSpan={9} className="text-center py-12 text-gray-500 font-bold text-sm">No hay equipos registrados o partidos finalizados en esta categoría.</td>
                 </tr>
               ) : (
                 posiciones.map((equipo, index) => (
@@ -174,7 +167,9 @@ export default function TablaPosiciones() {
                     <td className="px-3 py-4 text-center font-bold text-red-500 text-sm md:text-base">{equipo.jp}</td>
                     <td className="px-3 py-4 text-center font-semibold text-gray-600 text-sm md:text-base">{equipo.pf}</td>
                     <td className="px-3 py-4 text-center font-semibold text-gray-600 text-sm md:text-base">{equipo.pc}</td>
-                    <td className="px-3 py-4 text-center font-bold text-gray-800 text-sm md:text-base">{equipo.pf - equipo.pc}</td>
+                    <td className="px-3 py-4 text-center font-bold text-gray-800 text-sm md:text-base">
+                      {(equipo.pf - equipo.pc) > 0 ? `+${equipo.pf - equipo.pc}` : equipo.pf - equipo.pc}
+                    </td>
                     <td className="px-3 py-4 text-center font-black text-blue-600 text-base md:text-lg">{equipo.pts}</td>
                   </tr>
                 ))
