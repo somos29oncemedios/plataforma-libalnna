@@ -19,7 +19,7 @@ export default function RegistroJugadores() {
   const [categoriasSeleccionadas, setCategoriasSeleccionadas] = useState<string[]>([]);
   const [mensaje, setMensaje] = useState('');
 
-  // 🏀 NUEVOS ESTADOS PARA LOS FILTROS
+  // 🏀 ESTADOS PARA LOS FILTROS
   const [filtroBusqueda, setFiltroBusqueda] = useState('');
   const [filtroEquipo, setFiltroEquipo] = useState('');
   const [filtroCategoria, setFiltroCategoria] = useState('');
@@ -205,47 +205,61 @@ export default function RegistroJugadores() {
         )}
       </div>
 
-      {/* LISTA DE JUGADORES Y FILTROS */}
-      <div className="bg-white border border-gray-200 shadow-sm rounded-xl p-8">
-        <h2 className="text-2xl font-bold mb-6 text-gray-800 border-b pb-4">Atletas Fichados</h2>
+      {/* PANEL DE CONTEO Y FILTROS */}
+      <div className="bg-white border border-gray-200 shadow-sm rounded-xl p-8 mb-8">
+        <h2 className="text-2xl font-bold mb-6 text-gray-800 border-b pb-4">Panel de Control de Atletas</h2>
         
-        {/* 🏀 PANEL DE FILTROS */}
-        <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-6 flex flex-col md:flex-row gap-4">
-          <div className="flex-1">
-            <input 
-              type="text" 
-              placeholder="🔍 Buscar por nombre o número..." 
-              value={filtroBusqueda}
-              onChange={(e) => setFiltroBusqueda(e.target.value)}
-              className="w-full border border-gray-300 p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" 
-            />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* TARJETA DE MÉTRICA PRINCIPAL */}
+          <div className="bg-blue-600 rounded-xl p-6 shadow-md text-white flex flex-col items-center justify-center transform transition-all hover:scale-105">
+            <span className="text-blue-200 font-bold text-xs uppercase tracking-wider mb-2 text-center">Atletas Filtrados</span>
+            <span className="text-6xl font-black">{jugadoresFiltrados.length}</span>
           </div>
-          <div className="md:w-1/4">
-            <select 
-              value={filtroEquipo} 
-              onChange={(e) => setFiltroEquipo(e.target.value)}
-              className="w-full border border-gray-300 p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-            >
-              <option value="">Todos los Clubes</option>
-              {equipos.map(equipo => (
-                <option key={equipo.id} value={equipo.id}>{equipo.nombre}</option>
-              ))}
-            </select>
-          </div>
-          <div className="md:w-1/4">
-            <select 
-              value={filtroCategoria} 
-              onChange={(e) => setFiltroCategoria(e.target.value)}
-              className="w-full border border-gray-300 p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-            >
-              <option value="">Todas las Categorías</option>
-              {CATEGORIAS_DISPONIBLES.map(cat => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
-            </select>
+
+          {/* CONTROLES DE FILTRO */}
+          <div className="md:col-span-2 bg-gray-50 p-6 rounded-xl border border-gray-200 flex flex-col gap-4 justify-center">
+            <h3 className="text-xs font-bold text-gray-500 uppercase">Filtros Activos</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="flex flex-col gap-1">
+                <input 
+                  type="text" 
+                  placeholder="🔍 Nombre o número..." 
+                  value={filtroBusqueda}
+                  onChange={(e) => setFiltroBusqueda(e.target.value)}
+                  className="w-full border border-gray-300 p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-semibold text-gray-700" 
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <select 
+                  value={filtroEquipo} 
+                  onChange={(e) => setFiltroEquipo(e.target.value)}
+                  className="w-full border border-gray-300 p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-semibold text-gray-700"
+                >
+                  <option value="">Todos los Clubes</option>
+                  {equipos.map(equipo => (
+                    <option key={equipo.id} value={equipo.id}>{equipo.nombre}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <select 
+                  value={filtroCategoria} 
+                  onChange={(e) => setFiltroCategoria(e.target.value)}
+                  className="w-full border border-gray-300 p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-semibold text-gray-700"
+                >
+                  <option value="">Todas las Categorías</option>
+                  {CATEGORIAS_DISPONIBLES.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
           </div>
         </div>
-        
+      </div>
+
+      {/* LISTA DE JUGADORES */}
+      <div className="bg-white border border-gray-200 shadow-sm rounded-xl p-8">
         {/* RENDERIZADO DE LA LISTA FILTRADA */}
         {jugadores.length === 0 ? (
           <p className="text-gray-500 italic text-center py-6">No hay jugadores registrados en la base de datos.</p>
