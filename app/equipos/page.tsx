@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useMemo } from "react";
 import { useSearchParams } from 'next/navigation';
 import { supabase } from "../supabase";
 
@@ -13,6 +13,9 @@ function ListaEquipos() {
   const [jugadores, setJugadores] = useState<any[]>([]);
   const [estadisticas, setEstadisticas] = useState<any>({});
   const [cargando, setCargando] = useState(true);
+
+  // NUEVO ESTADO: Categoría activa para el equipo seleccionado
+  const [categoriaActiva, setCategoriaActiva] = useState<string>("Todas");
 
   useEffect(() => {
     const cargarDatos = async () => {
@@ -64,10 +67,42 @@ function ListaEquipos() {
       } else {
         setEquipoActivo(equipos[0]);
       }
+      // Al cambiar de equipo, reseteamos el filtro de categoría a "Todas"
+      setCategoriaActiva("Todas");
     }
   }, [equipos, equipoIdUrl]); 
 
-  const rosterActual = jugadores.filter((j: any) => j.equipo_id === equipoActivo?.id);
+  // Todos los jugadores del equipo activo
+  const rosterCompletoEquipo = useMemo(() => {
+    return jugadores.filter((j: any) => j.equipo_id === equipoActivo?.id);
+  }, [jugadores, equipoActivo]);
+
+  // Extraemos dinámicamente las categorías únicas de ESTE equipo
+  const categoriasDisponibles = useMemo(() => {
+    const cats = new Set<string>();
+    rosterCompletoEquipo.forEach((jugador: any) => {
+      if (Array.isArray(jugador.categorias)) {
+        // Solución: Le decimos a TypeScript que 'c' es un string
+        jugador.categorias.forEach((c: string) => cats.add(c));
+      } else if (jugador.categoria) {
+        cats.add(jugador.categoria); // Soporte por si usan un string
+      }
+    });
+    return ["Todas", ...Array.from(cats)].sort(); 
+  }, [rosterCompletoEquipo]);
+
+  // Filtramos el roster basándonos en la categoría activa
+  const rosterFiltrado = useMemo(() => {
+    if (categoriaActiva === "Todas") return rosterCompletoEquipo;
+    
+    return rosterCompletoEquipo.filter((jugador) => {
+       if (Array.isArray(jugador.categorias)) {
+           return jugador.categorias.includes(categoriaActiva);
+       }
+       return jugador.categoria === categoriaActiva;
+    });
+  }, [rosterCompletoEquipo, categoriaActiva]);
+
 
   return (
     <main className="container mx-auto py-8 md:py-12 px-4 max-w-6xl">
@@ -88,7 +123,10 @@ function ListaEquipos() {
             {equipos.map((equipo: any) => (
               <button
                 key={equipo.id}
-                onClick={() => setEquipoActivo(equipo)}
+                onClick={() => {
+                  setEquipoActivo(equipo);
+                  setCategoriaActiva("Todas"); // Resetear al cambiar equipo
+                }}
                 className={`flex items-center gap-2 px-4 py-2 md:px-6 md:py-3 rounded-full font-bold text-xs md:text-sm transition-all whitespace-nowrap border-2 ${
                   equipoActivo?.id === equipo.id
                     ? "bg-blue-600 text-white border-blue-600 shadow-md"
@@ -104,7 +142,7 @@ function ListaEquipos() {
           </div>
 
           {/* Información del Equipo Seleccionado (Banner) */}
-          <div className="bg-gray-900 rounded-2xl p-6 md:p-8 mb-8 flex flex-col md:flex-row items-center gap-4 md:gap-6 shadow-lg">
+          <div className="bg-gray-900 rounded-2xl p-6 md:p-8 mb-6 flex flex-col md:flex-row items-center gap-4 md:gap-6 shadow-lg">
             <div className="w-20 h-20 md:w-24 md:h-24 bg-white rounded-full flex items-center justify-center shrink-0 border-4 border-gray-800 p-2">
               {equipoActivo?.logo_url ? (
                 <img src={equipoActivo.logo_url} alt={equipoActivo.nombre} className="w-full h-full object-contain" />
@@ -112,20 +150,43 @@ function ListaEquipos() {
                 <span className="text-gray-300 font-black text-3xl md:text-4xl">{equipoActivo?.nombre.charAt(0)}</span>
               )}
             </div>
-            <div className="text-center md:text-left text-white">
+            <div className="text-center md:text-left text-white flex-1">
               <h2 className="text-2xl md:text-3xl font-black uppercase tracking-wide">{equipoActivo?.nombre}</h2>
-              <p className="text-blue-400 font-semibold text-sm md:text-base mt-1">Categorías: {equipoActivo?.categorias?.join(', ') || 'General'}</p>
+              <p className="text-blue-400 font-semibold text-sm md:text-base mt-1">Categorías Registradas: {equipoActivo?.categorias?.join(', ') || 'General'}</p>
             </div>
           </div>
 
+          {/* NUEVO: Selector de Categorías Dinámico (Solo aparece si el equipo tiene más de 1 categoría) */}
+          {categoriasDisponibles.length > 2 && ( 
+             <div className="flex overflow-x-auto gap-2 md:gap-3 mb-6 pb-2 scrollbar-hide justify-center md:justify-start">
+               {categoriasDisponibles.map(cat => (
+                 <button
+                    key={cat}
+                    onClick={() => setCategoriaActiva(cat)}
+                    className={`px-4 py-2 rounded-lg font-bold text-xs md:text-sm transition-all whitespace-nowrap ${
+                      categoriaActiva === cat
+                        ? "bg-gray-800 text-white shadow-sm"
+                        : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                    }`}
+                 >
+                    {cat}
+                 </button>
+               ))}
+             </div>
+          )}
+
           {/* Tarjetas de Jugadores (Roster) - Ajuste Móvil: grid-cols-2 */}
-          {rosterActual.length === 0 ? (
+          {rosterFiltrado.length === 0 ? (
             <div className="text-center py-12 md:py-16 bg-gray-50 rounded-xl border border-gray-200">
-              <p className="text-gray-500 font-semibold text-sm md:text-base">Este equipo aún no ha fichado jugadores en su plantilla.</p>
+              <p className="text-gray-500 font-semibold text-sm md:text-base">
+                {categoriaActiva === "Todas" 
+                  ? "Este equipo aún no ha fichado jugadores en su plantilla."
+                  : `No hay jugadores registrados en la categoría ${categoriaActiva}.`}
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-6">
-              {rosterActual.map((jugador: any) => {
+              {rosterFiltrado.map((jugador: any) => {
                 const stats = estadisticas[jugador.id] || { pj: 0, pts: 0, reb: 0, ast: 0, rob: 0, min: 0 };
                 const ppp = stats.pj > 0 ? (stats.pts / stats.pj).toFixed(1) : "0.0";
                 const rpp = stats.pj > 0 ? (stats.reb / stats.pj).toFixed(1) : "0.0";
