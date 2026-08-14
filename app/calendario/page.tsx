@@ -56,7 +56,7 @@ export default function Calendario() {
     : partidos.filter(partido => partido.categoria === categoriaActiva);
 
   // 2. Filtrar por Sección (Próximos vs Resultados)
-  const partidosAMostrar = partidosPorCategoria.filter(partido => {
+  let partidosAMostrar = partidosPorCategoria.filter(partido => {
     if (seccionActiva === "resultados") {
       return partido.estado === "finalizado";
     } else {
@@ -64,6 +64,12 @@ export default function Calendario() {
       return partido.estado !== "finalizado";
     }
   });
+
+  // 🏀 NUEVA JUGADA: Si estamos viendo los Resultados, invertimos el arreglo 
+  // para que el último partido finalizado aparezca de primero (orden cronológico inverso).
+  if (seccionActiva === "resultados") {
+    partidosAMostrar = partidosAMostrar.reverse();
+  }
 
   return (
     <main className="container mx-auto py-8 md:py-12 px-4 max-w-5xl">
