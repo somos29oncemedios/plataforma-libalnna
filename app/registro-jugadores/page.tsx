@@ -26,6 +26,9 @@ export default function RegistroJugadores() {
 
   const [editandoId, setEditandoId] = useState<string | null>(null);
 
+  // 🏀 NUEVO ESTADO: Puntos totales por jugador
+  const [puntosTotales, setPuntosTotales] = useState<any>({});
+
   const cargarDatos = async () => {
     const { data: eqData } = await supabase.from('equipos').select('*').order('nombre', { ascending: true });
     if (eqData) setEquipos(eqData);
@@ -35,6 +38,20 @@ export default function RegistroJugadores() {
       .select('*, equipo:equipos!equipo_id(nombre)')
       .order('nombre', { ascending: true });
     if (jugData) setJugadores(jugData);
+
+    // 🏀 NUEVA JUGADA: Descargar estadísticas de box_scores y sumar los puntos
+    const { data: statsData } = await supabase
+      .from('box_scores')
+      .select('jugador_id, puntos_totales');
+      
+    let ptsMap: any = {};
+    if (statsData) {
+      statsData.forEach((s: any) => {
+        if (!ptsMap[s.jugador_id]) ptsMap[s.jugador_id] = 0;
+        ptsMap[s.jugador_id] += (s.puntos_totales || 0);
+      });
+    }
+    setPuntosTotales(ptsMap);
   };
 
   useEffect(() => {
@@ -269,12 +286,14 @@ export default function RegistroJugadores() {
           <div className="grid gap-4">
             {jugadoresFiltrados.map(jugador => (
               <div key={jugador.id} className="flex flex-col md:flex-row justify-between items-center p-4 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors">
-                <div className="flex items-center gap-4 mb-4 md:mb-0 w-full md:w-auto">
-                  <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center shrink-0 overflow-hidden border border-gray-300">
+                
+                {/* Info y Foto */}
+                <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto text-center sm:text-left">
+                  <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center shrink-0 overflow-hidden border-2 border-gray-300 shadow-sm">
                     {jugador.foto_url ? (
                       <img src={jugador.foto_url} alt={jugador.nombre} className="w-full h-full object-cover" />
                     ) : (
-                      <span className="text-gray-500 font-black">#{jugador.numero}</span>
+                      <span className="text-gray-500 font-black text-xl">#{jugador.numero}</span>
                     )}
                   </div>
                   <div>
@@ -284,11 +303,18 @@ export default function RegistroJugadores() {
                     <p className="text-sm font-bold text-blue-600">{jugador.equipo?.nombre || 'Sin Equipo'}</p>
                     <p className="text-xs font-semibold text-gray-500 mt-1">Cats: {jugador.categorias?.join(', ')}</p>
                   </div>
+                  
+                  {/* 🏀 NUEVA JUGADA: Tarjeta de Puntos Totales */}
+                  <div className="bg-yellow-50 border border-yellow-300 px-5 py-2 rounded-xl flex flex-col items-center justify-center mt-3 sm:mt-0 sm:ml-4 shadow-sm min-w-[100px]">
+                    <span className="text-[10px] font-black text-yellow-800 uppercase tracking-wider">Total PTS</span>
+                    <span className="text-2xl font-black text-gray-900">{puntosTotales[jugador.id] || 0}</span>
+                  </div>
                 </div>
                 
-                <div className="flex gap-2 w-full md:w-auto">
-                  <button onClick={() => editarJugador(jugador)} className="bg-gray-800 hover:bg-gray-900 text-white font-bold px-6 py-2 rounded-md transition-colors w-full md:w-auto">Modificar</button>
-                  <button onClick={() => eliminarJugador(jugador.id)} className="bg-red-100 hover:bg-red-600 text-red-700 hover:text-white font-bold px-6 py-2 rounded-md transition-colors w-full md:w-auto">Eliminar</button>
+                {/* Botones de Acción */}
+                <div className="flex gap-2 w-full md:w-auto mt-4 md:mt-0">
+                  <button onClick={() => editarJugador(jugador)} className="bg-gray-800 hover:bg-gray-900 text-white font-bold px-6 py-2 rounded-md transition-colors w-full md:w-auto shadow-sm">Modificar</button>
+                  <button onClick={() => eliminarJugador(jugador.id)} className="bg-red-100 hover:bg-red-600 text-red-700 hover:text-white font-bold px-6 py-2 rounded-md transition-colors w-full md:w-auto shadow-sm">Eliminar</button>
                 </div>
               </div>
             ))}

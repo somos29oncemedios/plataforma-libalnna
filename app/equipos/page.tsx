@@ -14,7 +14,7 @@ function ListaEquipos() {
   const [estadisticas, setEstadisticas] = useState<any>({});
   const [cargando, setCargando] = useState(true);
 
-  // NUEVO ESTADO: Categoría activa para el equipo seleccionado
+  // ESTADO: Categoría activa para el equipo seleccionado
   const [categoriaActiva, setCategoriaActiva] = useState<string>("Todas");
 
   useEffect(() => {
@@ -41,14 +41,12 @@ function ListaEquipos() {
         if (statsData) {
           statsData.forEach((stat: any) => {
             if (!statsMap[stat.jugador_id]) {
-              statsMap[stat.jugador_id] = { pj: 0, pts: 0, reb: 0, ast: 0, rob: 0, min: 0 };
+              // Inicializamos con las métricas requeridas
+              statsMap[stat.jugador_id] = { pts: 0, tl: 0, t3: 0 };
             }
-            statsMap[stat.jugador_id].pj += 1;
             statsMap[stat.jugador_id].pts += (stat.puntos_totales || 0);
-            statsMap[stat.jugador_id].reb += (stat.rebotes || 0);
-            statsMap[stat.jugador_id].ast += (stat.asistencias || 0);
-            statsMap[stat.jugador_id].rob += (stat.recuperaciones || 0);
-            statsMap[stat.jugador_id].min += (stat.minutos_jugados || 0);
+            statsMap[stat.jugador_id].tl += (stat.tiros_libres_anotados || 0);
+            statsMap[stat.jugador_id].t3 += (stat.triples_anotados || 0);
           });
         }
         setEstadisticas(statsMap);
@@ -67,31 +65,26 @@ function ListaEquipos() {
       } else {
         setEquipoActivo(equipos[0]);
       }
-      // Al cambiar de equipo, reseteamos el filtro de categoría a "Todas"
       setCategoriaActiva("Todas");
     }
   }, [equipos, equipoIdUrl]); 
 
-  // Todos los jugadores del equipo activo
   const rosterCompletoEquipo = useMemo(() => {
     return jugadores.filter((j: any) => j.equipo_id === equipoActivo?.id);
   }, [jugadores, equipoActivo]);
 
-  // Extraemos dinámicamente las categorías únicas de ESTE equipo
   const categoriasDisponibles = useMemo(() => {
     const cats = new Set<string>();
     rosterCompletoEquipo.forEach((jugador: any) => {
       if (Array.isArray(jugador.categorias)) {
-        // Solución: Le decimos a TypeScript que 'c' es un string
         jugador.categorias.forEach((c: string) => cats.add(c));
       } else if (jugador.categoria) {
-        cats.add(jugador.categoria); // Soporte por si usan un string
+        cats.add(jugador.categoria);
       }
     });
     return ["Todas", ...Array.from(cats)].sort(); 
   }, [rosterCompletoEquipo]);
 
-  // Filtramos el roster basándonos en la categoría activa
   const rosterFiltrado = useMemo(() => {
     if (categoriaActiva === "Todas") return rosterCompletoEquipo;
     
@@ -102,7 +95,6 @@ function ListaEquipos() {
        return jugador.categoria === categoriaActiva;
     });
   }, [rosterCompletoEquipo, categoriaActiva]);
-
 
   return (
     <main className="container mx-auto py-8 md:py-12 px-4 max-w-6xl">
@@ -125,7 +117,7 @@ function ListaEquipos() {
                 key={equipo.id}
                 onClick={() => {
                   setEquipoActivo(equipo);
-                  setCategoriaActiva("Todas"); // Resetear al cambiar equipo
+                  setCategoriaActiva("Todas");
                 }}
                 className={`flex items-center gap-2 px-4 py-2 md:px-6 md:py-3 rounded-full font-bold text-xs md:text-sm transition-all whitespace-nowrap border-2 ${
                   equipoActivo?.id === equipo.id
@@ -156,7 +148,7 @@ function ListaEquipos() {
             </div>
           </div>
 
-          {/* NUEVO: Selector de Categorías Dinámico (Solo aparece si el equipo tiene más de 1 categoría) */}
+          {/* Selector de Categorías Dinámico */}
           {categoriasDisponibles.length > 2 && ( 
              <div className="flex overflow-x-auto gap-2 md:gap-3 mb-6 pb-2 scrollbar-hide justify-center md:justify-start">
                {categoriasDisponibles.map(cat => (
@@ -175,7 +167,7 @@ function ListaEquipos() {
              </div>
           )}
 
-          {/* Tarjetas de Jugadores (Roster) - Ajuste Móvil: grid-cols-2 */}
+          {/* Tarjetas de Jugadores (Roster) */}
           {rosterFiltrado.length === 0 ? (
             <div className="text-center py-12 md:py-16 bg-gray-50 rounded-xl border border-gray-200">
               <p className="text-gray-500 font-semibold text-sm md:text-base">
@@ -187,10 +179,7 @@ function ListaEquipos() {
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-6">
               {rosterFiltrado.map((jugador: any) => {
-                const stats = estadisticas[jugador.id] || { pj: 0, pts: 0, reb: 0, ast: 0, rob: 0, min: 0 };
-                const ppp = stats.pj > 0 ? (stats.pts / stats.pj).toFixed(1) : "0.0";
-                const rpp = stats.pj > 0 ? (stats.reb / stats.pj).toFixed(1) : "0.0";
-                const app = stats.pj > 0 ? (stats.ast / stats.pj).toFixed(1) : "0.0";
+                const stats = estadisticas[jugador.id] || { pts: 0, tl: 0, t3: 0 };
 
                 return (
                   <div key={jugador.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow flex flex-col">
@@ -208,26 +197,25 @@ function ListaEquipos() {
                     </div>
                     
                     {/* Datos del Jugador */}
-                    <div className="px-3 md:px-5 pt-4 md:pt-6 pb-3 md:pb-4">
-                      <h3 className="font-black text-gray-900 text-sm md:text-lg uppercase tracking-tight truncate" title={jugador.nombre}>
+                    <div className="px-3 md:px-5 pt-4 md:pt-6 pb-3 md:pb-4 flex flex-col justify-center items-center md:items-start">
+                      <h3 className="font-black text-gray-900 text-sm md:text-lg uppercase tracking-tight truncate text-center md:text-left w-full" title={jugador.nombre}>
                         {jugador.nombre}
                       </h3>
-                      <p className="text-[10px] md:text-xs font-semibold text-gray-500 mt-0.5 md:mt-1">PJ: {stats.pj} • MIN: {stats.min}</p>
                     </div>
 
-                    {/* Estadísticas (Promedios) */}
+                    {/* Estadísticas Solicitadas (Totales) */}
                     <div className="bg-gray-50 grid grid-cols-3 divide-x divide-gray-200 border-t border-gray-100 mt-auto">
                       <div className="p-2 md:p-3 text-center">
                         <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5 md:mb-1">PTS</p>
-                        <p className="font-bold text-gray-800 text-sm md:text-base">{ppp}</p>
+                        <p className="font-bold text-gray-800 text-sm md:text-base">{stats.pts}</p>
                       </div>
                       <div className="p-2 md:p-3 text-center">
-                        <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5 md:mb-1">REB</p>
-                        <p className="font-bold text-gray-800 text-sm md:text-base">{rpp}</p>
+                        <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5 md:mb-1">T. LIBRES</p>
+                        <p className="font-bold text-gray-800 text-sm md:text-base">{stats.tl}</p>
                       </div>
                       <div className="p-2 md:p-3 text-center">
-                        <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5 md:mb-1">AST</p>
-                        <p className="font-bold text-gray-800 text-sm md:text-base">{app}</p>
+                        <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5 md:mb-1">TRIPLES</p>
+                        <p className="font-bold text-gray-800 text-sm md:text-base">{stats.t3}</p>
                       </div>
                     </div>
                   </div>
