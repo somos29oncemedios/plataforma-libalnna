@@ -43,7 +43,7 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
     if (partidoData) {
       setPartido(partidoData);
 
-      // 🏀 TÁCTICA CORREGIDA: Traemos a TODOS los jugadores de ambos equipos primero
+      // Traemos a TODOS los jugadores de ambos equipos primero
       const { data: jugadoresData } = await supabase
         .from('jugadores')
         .select('*')
@@ -51,9 +51,9 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
         .order('numero', { ascending: true });
 
       if (jugadoresData) {
-        // 🏀 FILTRO FRONTEND: Verificamos si la categoría del partido está dentro del "arreglo de categorías" del jugador
+        // Filtramos verificando el arreglo de categorías del jugador
         const jugadoresFiltrados = jugadoresData.filter((j: any) => {
-          if (!partidoData.categoria) return true; // Si el partido no tiene categoría, pasan todos
+          if (!partidoData.categoria) return true; 
           
           if (Array.isArray(j.categorias)) {
             return j.categorias.includes(partidoData.categoria);
@@ -112,12 +112,26 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
     setCanchaVisitante(selVisitante);
     setBancaVisitante(rosterVisitanteCompleto.filter(j => !selVisitante.find(s => s.id === j.id)));
     
-    setSeleccionInicial(false); // Cierra la pantalla inicial y muestra la cancha
+    setSeleccionInicial(false);
 
     // Si el partido estaba programado, lo pasamos a "en curso" automáticamente
     if (partido?.estado === 'programado') {
       await supabase.from('partidos').update({ estado: 'en curso' }).eq('id', id);
       setPartido({ ...partido, estado: 'en curso' });
+    }
+  };
+
+  // 🏀 NUEVA FUNCIÓN: REVERTIR ESTADO A "PROGRAMADO"
+  const revertirAProgramado = async () => {
+    const confirmar = window.confirm("⚠️ ¿Estás seguro de que deseas devolver este partido a 'Programado'? Esto quitará el partido de la vista 'En Vivo' del público.");
+    if (!confirmar) return;
+
+    const { error } = await supabase.from('partidos').update({ estado: 'programado' }).eq('id', id);
+    if (!error) {
+      alert('✅ Partido devuelto a estado Programado correctamente.');
+      setPartido({ ...partido, estado: 'programado' });
+    } else {
+      alert(`❌ Error técnico: ${error.message}`);
     }
   };
 
@@ -367,7 +381,7 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
             </div>
           </div>
 
-          <div className="mt-8 flex justify-center">
+          <div className="mt-8 flex flex-col items-center gap-4">
             <button
               disabled={(!isLocalReady && rosterLocalCompleto.length >= 5) || (!isVisitaReady && rosterVisitanteCompleto.length >= 5)}
               onClick={confirmarQuintetos}
@@ -375,6 +389,16 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
             >
               Confirmar e Ir a la Cancha 🏀
             </button>
+
+            {/* BOTÓN PARA REVERTIR PARTIDO EN CURSO DESDE LA FASE 0 */}
+            {partido?.estado === 'en curso' && (
+              <button 
+                onClick={revertirAProgramado} 
+                className="text-red-500 hover:text-red-700 text-xs font-bold underline transition-colors"
+              >
+                ⏪ Cancelar y devolver partido a "Programado"
+              </button>
+            )}
           </div>
         </div>
       </main>
@@ -537,7 +561,7 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
                  onClick={(e) => { e.stopPropagation(); setAccionPendiente('d2'); }}
                ></div>
 
-               {/* CÍRCULO TIRO LIBRE IZQUIERDO (AUMENTADO A w-14 h-14 en PC y w-9 h-9 en Móvil) */}
+               {/* CÍRCULO TIRO LIBRE IZQUIERDO */}
                <div 
                  className={`absolute top-1/2 left-[25%] w-9 h-9 md:w-14 md:h-14 border-[3px] border-white rounded-full -translate-y-1/2 -translate-x-1/2 cursor-pointer flex items-center justify-center transition-colors duration-200 z-30 ${accionPendiente === 'tl' ? (modoOperacion === 'sumar' ? 'bg-yellow-400' : 'bg-red-500') : 'bg-red-600 hover:bg-red-500'}`}
                  onClick={(e) => { e.stopPropagation(); setAccionPendiente('tl'); }}
@@ -567,7 +591,7 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
                  onClick={(e) => { e.stopPropagation(); setAccionPendiente('d2'); }}
                ></div>
 
-               {/* CÍRCULO TIRO LIBRE DERECHO (AUMENTADO A w-14 h-14 en PC y w-9 h-9 en Móvil) */}
+               {/* CÍRCULO TIRO LIBRE DERECHO */}
                <div 
                  className={`absolute top-1/2 right-[25%] w-9 h-9 md:w-14 md:h-14 border-[3px] border-white rounded-full -translate-y-1/2 translate-x-1/2 cursor-pointer flex items-center justify-center transition-colors duration-200 z-30 ${accionPendiente === 'tl' ? (modoOperacion === 'sumar' ? 'bg-yellow-400' : 'bg-red-500') : 'bg-red-600 hover:bg-red-500'}`}
                  onClick={(e) => { e.stopPropagation(); setAccionPendiente('tl'); }}
@@ -682,11 +706,20 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
         </div>
       )}
 
-      {/* Botón Finalizar Partido */}
-      <div className="flex justify-center mt-1">
-        <button onClick={finalizarPartido} className="bg-gray-900 hover:bg-black text-white font-black px-3 py-1.5 rounded-lg shadow-md transition-all uppercase tracking-widest text-[9px] border-b-2 border-gray-700 active:border-b-0">
+      {/* Botones de Control de Partido (FINALIZAR Y REVERTIR) */}
+      <div className="flex flex-col items-center gap-2 mt-2 mb-2">
+        <button onClick={finalizarPartido} className="bg-gray-900 hover:bg-black text-white font-black px-4 py-2 rounded-xl shadow-md transition-all uppercase tracking-widest text-[10px] border-b-2 border-gray-700 active:border-b-0">
           Pitar Final del Partido
         </button>
+        
+        {partido?.estado === 'en curso' && (
+          <button 
+            onClick={revertirAProgramado} 
+            className="text-gray-500 hover:text-red-600 text-[9px] font-bold underline transition-colors"
+          >
+            ⏪ Devolver partido a "Programado"
+          </button>
+        )}
       </div>
     </main>
   );
