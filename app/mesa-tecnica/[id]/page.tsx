@@ -20,8 +20,9 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
   // 🏀 ESTADO PARA MODAL DE BANCA
   const [modalBanca, setModalBanca] = useState<'local' | 'visitante' | null>(null);
 
-  // 🏀 ESTADO PARA LA MEMORIA MUSCULAR (El tiro previo)
+  // 🏀 ESTADOS PARA LA MEMORIA MUSCULAR (Acción y Operación: sumar o restar)
   const [accionPendiente, setAccionPendiente] = useState<'tl' | 'd2' | 't3' | null>(null);
+  const [modoOperacion, setModoOperacion] = useState<'sumar' | 'restar'>('sumar');
 
   const cargarPartido = async () => {
     const { data: partidoData } = await supabase
@@ -176,6 +177,14 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
     await supabase.from('partidos').update({ puntos_local: finalSLocal, puntos_visitante: finalSVis }).eq('id', id);
   };
 
+  const cambiarPeriodo = async (nuevoPeriodo: string) => {
+    if (partidoBloqueado) return;
+    const { error } = await supabase.from('partidos').update({ periodo_actual: nuevoPeriodo }).eq('id', id);
+    if (!error) {
+      setPartido({ ...partido, periodo_actual: nuevoPeriodo });
+    }
+  };
+
   const finalizarPartido = async () => {
     const confirmar = window.confirm("🛑 ¿Estás seguro de guardar el marcador definitivo y cerrar el panel del partido?");
     if (!confirmar) return;
@@ -221,7 +230,7 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
       alert("⚠️ Primero toca la zona de la cancha desde donde se hizo el tiro.");
       return;
     }
-    anotarEstadistica(jugador.id, equipoId, accionPendiente, 'sumar');
+    anotarEstadistica(jugador.id, equipoId, accionPendiente, modoOperacion);
     setAccionPendiente(null); 
   };
 
@@ -235,21 +244,20 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
 
   if (cargando) return <div className="text-center py-20 font-bold text-gray-500">Preparando la Mesa Técnica...</div>;
 
-  // COMPONENTE DE JUGADOR EN CANCHA (Ajustado en tamaño y compacto)
   const JugadorCancha = ({ jugador, equipo, tipoEquipo }: { jugador: any, equipo: string, tipoEquipo: 'local'|'visitante' }) => {
     const stats = estadisticas?.[jugador.id] || { puntos_totales: 0, tiros_libres_anotados: 0, triples_anotados: 0 };
     return (
-      <div className={`flex flex-col items-center bg-white p-1.5 md:p-2 rounded-lg border-2 shadow-sm relative w-[18%] lg:w-full transition-all ${accionPendiente ? 'border-yellow-400 scale-105 shadow-yellow-200' : 'border-gray-200'}`}>
+      <div className={`flex flex-col items-center bg-white p-1 rounded-lg border-2 shadow-sm relative w-[18%] lg:w-full transition-all ${accionPendiente ? (modoOperacion === 'sumar' ? 'border-yellow-400 scale-105 shadow-yellow-200' : 'border-red-500 scale-105 shadow-red-200 animate-pulse') : 'border-gray-200'}`}>
         <button 
           onClick={() => clickCamisetaJugador(jugador, equipo)}
-          className={`w-9 h-9 md:w-11 md:h-11 rounded-full flex items-center justify-center font-black text-sm md:text-lg shadow-md transition-transform hover:scale-110 mb-1 ${tipoEquipo === 'local' ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-red-600 text-white hover:bg-red-500'} ${accionPendiente ? 'animate-pulse ring-2 ring-yellow-400' : ''}`}
+          className={`w-7 h-7 md:w-9 md:h-9 rounded-full flex items-center justify-center font-black text-xs md:text-sm shadow-md transition-transform hover:scale-110 mb-0.5 ${tipoEquipo === 'local' ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-red-600 text-white hover:bg-red-500'} ${accionPendiente ? (modoOperacion === 'sumar' ? 'ring-2 ring-yellow-400' : 'ring-2 ring-red-500 bg-red-700') : ''}`}
         >
           {jugador.numero}
         </button>
-        <span className="text-[7px] md:text-[8px] font-black uppercase text-gray-800 text-center leading-tight truncate w-full mb-0.5">{jugador.nombre}</span>
+        <span className="text-[6px] md:text-[7px] font-black uppercase text-gray-800 text-center leading-tight truncate w-full mb-0.5">{jugador.nombre}</span>
         
-        <div className="w-full bg-gray-50 border border-gray-100 rounded flex flex-col p-0.5 text-[6px] md:text-[7.5px] gap-0.2">
-          <div className="flex justify-between font-black text-blue-700 border-b border-gray-200 pb-0.2 mb-0.2">
+        <div className="w-full bg-gray-50 border border-gray-100 rounded flex flex-col p-0.5 text-[5px] md:text-[6.5px] gap-0.1">
+          <div className="flex justify-between font-black text-blue-700 border-b border-gray-200 pb-0.1 mb-0.1">
             <span>PTS</span> <span>{stats.puntos_totales || 0}</span>
           </div>
           <div className="flex justify-between font-bold text-gray-500">
@@ -260,7 +268,7 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
           </div>
         </div>
 
-        <button onClick={() => sustituirJugador(jugador, tipoEquipo, 'salir')} className="mt-1 text-[6px] md:text-[7.5px] bg-gray-100 hover:bg-gray-200 text-gray-700 px-1 py-0.5 rounded font-bold w-full">
+        <button onClick={() => sustituirJugador(jugador, tipoEquipo, 'salir')} className="mt-0.5 text-[5px] md:text-[6.5px] bg-gray-100 hover:bg-gray-200 text-gray-700 px-0.5 py-0.2 rounded font-bold w-full">
           ⬇️ Salir
         </button>
       </div>
@@ -268,39 +276,82 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
   };
 
   return (
-    <main className="container mx-auto py-3 px-2 max-w-[1400px]">
-      {/* MARCADOR GLOBAL EN VIVO (Ultra compacto) */}
-      <div className="bg-gray-900 rounded-xl p-3 mb-3 shadow-xl text-white flex flex-col md:flex-row justify-between items-center gap-2">
+    <main className="container mx-auto py-1 px-1 max-w-[1400px]">
+      {/* MARCADOR GLOBAL EN VIVO CON BOTONES DE PERÍODO INTEGRADOS */}
+      <div className="bg-gray-900 rounded-xl p-2 mb-1.5 shadow-xl text-white flex flex-col md:flex-row justify-between items-center gap-1.5">
+        
+        {/* EQUIPO LOCAL */}
         <div className="flex flex-col items-center md:w-1/3">
-          <span className="text-[10px] font-bold text-blue-400 tracking-wider">LOCAL</span>
-          <h2 className="text-sm md:text-xl font-black uppercase text-center line-clamp-1">{partido?.local?.nombre}</h2>
+          <span className="text-[8px] font-bold text-blue-400 tracking-wider">LOCAL</span>
+          <h2 className="text-xs md:text-base font-black uppercase text-center line-clamp-1">{partido?.local?.nombre}</h2>
         </div>
-        <div className="flex flex-col items-center justify-center bg-gray-800 px-5 py-1.5 rounded-xl border border-gray-700">
-          <div className="flex items-center gap-3">
-            <span className="text-2xl md:text-4xl font-black text-yellow-400">{scoreLocal}</span>
-            <span className="text-lg text-gray-500">-</span>
-            <span className="text-2xl md:text-4xl font-black text-yellow-400">{scoreVisitante}</span>
+
+        {/* CENTRO: MARCADOR Y SELECTOR DE CUARTOS / TIEMPO EXTRA */}
+        <div className="flex flex-col items-center justify-center bg-gray-800 px-3 py-1 rounded-xl border border-gray-700">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-lg md:text-2xl font-black text-yellow-400">{scoreLocal}</span>
+            <span className="text-sm text-gray-500">-</span>
+            <span className="text-lg md:text-2xl font-black text-yellow-400">{scoreVisitante}</span>
           </div>
-          <span className="text-blue-400 font-bold text-[9px] md:text-[10px]">PERÍODO: {partido?.periodo_actual || '1Q'}</span>
+          
+          {/* Botones de Control de Período */}
+          <div className="flex items-center gap-1 bg-gray-900/80 p-0.5 rounded-lg border border-gray-700">
+            {['1Q', '2Q', '3Q', '4Q', 'Extra'].map(q => (
+              <button
+                key={q}
+                onClick={() => cambiarPeriodo(q)}
+                className={`px-2 py-0.5 rounded text-[9px] font-black transition-all ${
+                  partido?.periodo_actual === q 
+                    ? 'bg-blue-600 text-white shadow-sm' 
+                    : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                }`}
+              >
+                {q}
+              </button>
+            ))}
+          </div>
         </div>
+
+        {/* EQUIPO VISITANTE */}
         <div className="flex flex-col items-center md:w-1/3">
-          <span className="text-[10px] font-bold text-red-400 tracking-wider">VISITANTE</span>
-          <h2 className="text-sm md:text-xl font-black uppercase text-center line-clamp-1">{partido?.visitante?.nombre}</h2>
+          <span className="text-[8px] font-bold text-red-400 tracking-wider">VISITANTE</span>
+          <h2 className="text-xs md:text-base font-black uppercase text-center line-clamp-1">{partido?.visitante?.nombre}</h2>
+        </div>
+
+      </div>
+
+      {/* SELECTOR DE MODO (SUMAR VS RESTAR) */}
+      <div className="bg-white rounded-xl p-1 mb-1.5 shadow-sm border border-gray-200 flex justify-center items-center gap-3">
+        <span className="text-[10px] font-black text-gray-700 uppercase">Modo:</span>
+        <div className="flex bg-gray-100 p-0.5 rounded-lg">
+          <button 
+            onClick={() => setModoOperacion('sumar')} 
+            className={`px-2.5 py-0.5 rounded-md text-[11px] font-black transition-all ${modoOperacion === 'sumar' ? 'bg-green-600 text-white shadow' : 'text-gray-600 hover:bg-gray-200'}`}
+          >
+            ➕ Sumar
+          </button>
+          <button 
+            onClick={() => setModoOperacion('restar')} 
+            className={`px-2.5 py-0.5 rounded-md text-[11px] font-black transition-all ${modoOperacion === 'restar' ? 'bg-red-600 text-white shadow' : 'text-gray-600 hover:bg-gray-200'}`}
+          >
+            ➖ Restar / Corregir
+          </button>
         </div>
       </div>
 
-      {/* 🏀 LAYOUT DE 3 COLUMNAS: DISTRIBUIDAS EXACTAMENTE AL ALTO DE LA CANCHA */}
-      <div className="flex flex-col lg:flex-row gap-3 mb-4 items-stretch">
+      {/* LAYOUT DE 3 COLUMNAS MÁS JUNTO */}
+      <div className="flex flex-col lg:flex-row gap-1.5 mb-1.5 items-stretch">
         
-        {/* COLUMNA IZQUIERDA: LOCAL EN CANCHA (Ocupa el alto exacto distribuyendose de arriba a abajo) */}
-        <div className="w-full lg:w-1/4 bg-blue-50/50 rounded-2xl p-2.5 border-2 border-blue-100 shadow-inner order-2 lg:order-1 flex flex-col justify-between">
-          <div className="w-full flex justify-between items-center mb-1 border-b-2 border-blue-200 pb-1">
-            <span className="font-black text-blue-800 text-[11px] uppercase">Local En Cancha</span>
-            <span className="text-[9px] bg-blue-600 text-white px-2 py-0.5 rounded-lg">{canchaLocal.length}/5</span>
+        {/* COLUMNA IZQUIERDA: EQUIPO LOCAL EN CANCHA */}
+        <div className="w-full lg:w-1/4 bg-blue-50/50 rounded-xl p-1.5 border-2 border-blue-100 shadow-inner order-2 lg:order-1 flex flex-col justify-between">
+          <div className="w-full flex justify-between items-center mb-0.5 border-b border-blue-200 pb-0.5">
+            <span className="font-black text-blue-800 text-[9px] uppercase tracking-wide truncate max-w-[75%]">
+              {partido?.local?.nombre || 'Local'}
+            </span>
+            <span className="text-[7.5px] bg-blue-600 text-white px-1 py-0.2 rounded">{canchaLocal.length}/5</span>
           </div>
           
-          {/* Los 5 jugadores se distribuyen verticalmente llenando el espacio sin rebasar */}
-          <div className="flex flex-row lg:flex-col justify-between items-center gap-1 w-full flex-1 my-1">
+          <div className="flex flex-row lg:flex-col justify-between items-center gap-0.5 w-full flex-1 my-0.5">
             {canchaLocal.map(jugador => (
               <JugadorCancha key={jugador.id} jugador={jugador} equipo={partido.equipo_local_id} tipoEquipo="local" />
             ))}
@@ -308,17 +359,17 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
 
           <button 
             onClick={() => setModalBanca('local')}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-black py-1.5 px-2 rounded-xl shadow transition-all uppercase tracking-wide flex items-center justify-center gap-1 mt-1"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white text-[9px] font-black py-1 px-1.5 rounded-lg shadow transition-all uppercase tracking-wide flex items-center justify-center gap-1 mt-0.5"
           >
-            🔄 Sustituciones Banca ({bancaLocal.length})
+            🔄 Banca ({bancaLocal.length})
           </button>
         </div>
 
         {/* COLUMNA CENTRAL: CANCHA INTERACTIVA FULL COURT */}
         <div className="w-full lg:w-2/4 flex flex-col items-center order-1 lg:order-2">
-          <div className="bg-white rounded-2xl p-2.5 w-full shadow-sm border-2 border-gray-200 flex flex-col items-center">
-            <p className="text-xs md:text-sm font-black text-gray-800 uppercase mb-2 text-center">
-              1. Toca la zona desde donde se lanzó
+          <div className="bg-white rounded-xl p-1.5 w-full shadow-sm border-2 border-gray-200 flex flex-col items-center">
+            <p className="text-[10px] md:text-xs font-black text-gray-800 uppercase mb-1 text-center">
+              1. Toca la zona {modoOperacion === 'restar' ? 'para RESTAR' : 'para SUMAR'}
             </p>
             
             {/* DIBUJO DE LA CANCHA COMPLETA */}
@@ -326,94 +377,96 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
                
                {/* LÍNEA Y CÍRCULO CENTRAL */}
                <div className="absolute top-0 bottom-0 left-1/2 w-1 bg-white -translate-x-1/2 pointer-events-none z-20" />
-               <div className="absolute top-1/2 left-1/2 w-12 h-12 md:w-20 md:h-20 border-2 border-white rounded-full -translate-x-1/2 -translate-y-1/2 pointer-events-none z-20" />
+               <div className="absolute top-1/2 left-1/2 w-8 h-8 md:w-14 md:h-14 border-2 border-white rounded-full -translate-x-1/2 -translate-y-1/2 pointer-events-none z-20" />
 
                {/* MITAD IZQUIERDA */}
                <div 
-                 className={`absolute top-0 bottom-0 left-0 w-1/2 cursor-pointer flex items-center justify-start pl-2 transition-colors duration-200 z-0 ${accionPendiente === 't3' ? 'bg-yellow-400' : 'bg-gray-800 hover:bg-gray-700'}`}
+                 className={`absolute top-0 bottom-0 left-0 w-1/2 cursor-pointer flex items-center justify-start pl-1.5 transition-colors duration-200 z-0 ${accionPendiente === 't3' ? (modoOperacion === 'sumar' ? 'bg-yellow-400' : 'bg-red-500') : 'bg-gray-800 hover:bg-gray-700'}`}
                  onClick={() => setAccionPendiente('t3')}
                >
-                 <span className={`font-black text-xs md:text-sm pointer-events-none -rotate-90 transition-colors ${accionPendiente === 't3' ? 'text-gray-900' : 'text-white/40'}`}>3 PTS</span>
+                 <span className={`font-black text-[9px] md:text-[11px] pointer-events-none -rotate-90 transition-colors ${accionPendiente === 't3' ? 'text-gray-900' : 'text-white/40'}`}>3 PTS</span>
                </div>
                
                <div 
-                 className={`absolute top-[10%] bottom-[10%] left-0 w-[45%] border-2 border-white rounded-r-full cursor-pointer flex items-center justify-end pr-2 transition-colors duration-200 z-10 ${accionPendiente === 'd2' ? 'bg-yellow-400' : 'bg-blue-600 hover:bg-blue-500'}`}
+                 className={`absolute top-[10%] bottom-[10%] left-0 w-[45%] border-2 border-white rounded-r-full cursor-pointer flex items-center justify-end pr-1.5 transition-colors duration-200 z-10 ${accionPendiente === 'd2' ? (modoOperacion === 'sumar' ? 'bg-yellow-400' : 'bg-red-500') : 'bg-blue-600 hover:bg-blue-500'}`}
                  onClick={(e) => { e.stopPropagation(); setAccionPendiente('d2'); }}
                >
-                 <span className={`font-black text-[10px] md:text-sm pointer-events-none transition-colors ${accionPendiente === 'd2' ? 'text-gray-900' : 'text-white/80'}`}>2 PTS</span>
+                 <span className={`font-black text-[8px] md:text-[11px] pointer-events-none transition-colors ${accionPendiente === 'd2' ? 'text-gray-900' : 'text-white/80'}`}>2 PTS</span>
                </div>
 
                <div 
-                 className={`absolute top-[35%] bottom-[35%] left-0 w-[25%] border-2 border-white cursor-pointer transition-colors duration-200 z-20 ${accionPendiente === 'd2' ? 'bg-yellow-400' : 'bg-blue-800 hover:bg-blue-700'}`}
+                 className={`absolute top-[35%] bottom-[35%] left-0 w-[25%] border-2 border-white cursor-pointer transition-colors duration-200 z-20 ${accionPendiente === 'd2' ? (modoOperacion === 'sumar' ? 'bg-yellow-400' : 'bg-red-500') : 'bg-blue-800 hover:bg-blue-700'}`}
                  onClick={(e) => { e.stopPropagation(); setAccionPendiente('d2'); }}
                ></div>
 
                <div 
-                 className={`absolute top-1/2 left-[25%] w-8 h-8 md:w-12 md:h-12 border-2 border-white rounded-full -translate-y-1/2 -translate-x-1/2 cursor-pointer flex items-center justify-center transition-colors duration-200 z-30 ${accionPendiente === 'tl' ? 'bg-yellow-400' : 'bg-red-600 hover:bg-red-500'}`}
+                 className={`absolute top-1/2 left-[25%] w-5 h-5 md:w-8 md:h-8 border-2 border-white rounded-full -translate-y-1/2 -translate-x-1/2 cursor-pointer flex items-center justify-center transition-colors duration-200 z-30 ${accionPendiente === 'tl' ? (modoOperacion === 'sumar' ? 'bg-yellow-400' : 'bg-red-500') : 'bg-red-600 hover:bg-red-500'}`}
                  onClick={(e) => { e.stopPropagation(); setAccionPendiente('tl'); }}
                >
-                 <span className={`font-black text-[7px] md:text-[10px] pointer-events-none transition-colors ${accionPendiente === 'tl' ? 'text-gray-900' : 'text-white'}`}>1 PT</span>
+                 <span className={`font-black text-[5.5px] md:text-[8px] pointer-events-none transition-colors ${accionPendiente === 'tl' ? 'text-gray-900' : 'text-white'}`}>1 PT</span>
                </div>
                
-               <div className="absolute top-1/2 left-2 w-3 h-3 md:w-5 md:h-5 border-2 border-orange-400 rounded-full -translate-y-1/2 pointer-events-none bg-orange-200/50 z-40" />
+               <div className="absolute top-1/2 left-2 w-2 h-2 md:w-3 md:h-3 border border-orange-400 rounded-full -translate-y-1/2 pointer-events-none bg-orange-200/50 z-40" />
 
                {/* MITAD DERECHA */}
                <div 
-                 className={`absolute top-0 bottom-0 right-0 w-1/2 cursor-pointer flex items-center justify-end pr-2 transition-colors duration-200 z-0 ${accionPendiente === 't3' ? 'bg-yellow-400' : 'bg-gray-800 hover:bg-gray-700'}`}
+                 className={`absolute top-0 bottom-0 right-0 w-1/2 cursor-pointer flex items-center justify-end pr-1.5 transition-colors duration-200 z-0 ${accionPendiente === 't3' ? (modoOperacion === 'sumar' ? 'bg-yellow-400' : 'bg-red-500') : 'bg-gray-800 hover:bg-gray-700'}`}
                  onClick={() => setAccionPendiente('t3')}
                >
-                 <span className={`font-black text-xs md:text-sm pointer-events-none rotate-90 transition-colors ${accionPendiente === 't3' ? 'text-gray-900' : 'text-white/40'}`}>3 PTS</span>
+                 <span className={`font-black text-[9px] md:text-[11px] pointer-events-none rotate-90 transition-colors ${accionPendiente === 't3' ? 'text-gray-900' : 'text-white/40'}`}>3 PTS</span>
                </div>
                
                <div 
-                 className={`absolute top-[10%] bottom-[10%] right-0 w-[45%] border-2 border-white rounded-l-full cursor-pointer flex items-center justify-start pl-2 transition-colors duration-200 z-10 ${accionPendiente === 'd2' ? 'bg-yellow-400' : 'bg-blue-600 hover:bg-blue-500'}`}
+                 className={`absolute top-[10%] bottom-[10%] right-0 w-[45%] border-2 border-white rounded-l-full cursor-pointer flex items-center justify-start pl-1.5 transition-colors duration-200 z-10 ${accionPendiente === 'd2' ? (modoOperacion === 'sumar' ? 'bg-yellow-400' : 'bg-red-500') : 'bg-blue-600 hover:bg-blue-500'}`}
                  onClick={(e) => { e.stopPropagation(); setAccionPendiente('d2'); }}
                >
-                 <span className={`font-black text-[10px] md:text-sm pointer-events-none transition-colors ${accionPendiente === 'd2' ? 'text-gray-900' : 'text-white/80'}`}>2 PTS</span>
+                 <span className={`font-black text-[8px] md:text-[11px] pointer-events-none transition-colors ${accionPendiente === 'd2' ? 'text-gray-900' : 'text-white/80'}`}>2 PTS</span>
                </div>
 
                <div 
-                 className={`absolute top-[35%] bottom-[35%] right-0 w-[25%] border-2 border-white cursor-pointer transition-colors duration-200 z-20 ${accionPendiente === 'd2' ? 'bg-yellow-400' : 'bg-blue-800 hover:bg-blue-700'}`}
+                 className={`absolute top-[35%] bottom-[35%] right-0 w-[25%] border-2 border-white cursor-pointer transition-colors duration-200 z-20 ${accionPendiente === 'd2' ? (modoOperacion === 'sumar' ? 'bg-yellow-400' : 'bg-red-500') : 'bg-blue-800 hover:bg-blue-700'}`}
                  onClick={(e) => { e.stopPropagation(); setAccionPendiente('d2'); }}
                ></div>
 
                <div 
-                 className={`absolute top-1/2 right-[25%] w-8 h-8 md:w-12 md:h-12 border-2 border-white rounded-full -translate-y-1/2 translate-x-1/2 cursor-pointer flex items-center justify-center transition-colors duration-200 z-30 ${accionPendiente === 'tl' ? 'bg-yellow-400' : 'bg-red-600 hover:bg-red-500'}`}
+                 className={`absolute top-1/2 right-[25%] w-5 h-5 md:w-8 md:h-8 border-2 border-white rounded-full -translate-y-1/2 translate-x-1/2 cursor-pointer flex items-center justify-center transition-colors duration-200 z-30 ${accionPendiente === 'tl' ? (modoOperacion === 'sumar' ? 'bg-yellow-400' : 'bg-red-500') : 'bg-red-600 hover:bg-red-500'}`}
                  onClick={(e) => { e.stopPropagation(); setAccionPendiente('tl'); }}
                >
-                 <span className={`font-black text-[7px] md:text-[10px] pointer-events-none transition-colors ${accionPendiente === 'tl' ? 'text-gray-900' : 'text-white'}`}>1 PT</span>
+                 <span className={`font-black text-[5.5px] md:text-[8px] pointer-events-none transition-colors ${accionPendiente === 'tl' ? 'text-gray-900' : 'text-white'}`}>1 PT</span>
                </div>
 
-               <div className="absolute top-1/2 right-2 w-3 h-3 md:w-5 md:h-5 border-2 border-orange-400 rounded-full -translate-y-1/2 pointer-events-none bg-orange-200/50 z-40" />
+               <div className="absolute top-1/2 right-2 w-2 h-2 md:w-3 md:h-3 border border-orange-400 rounded-full -translate-y-1/2 pointer-events-none bg-orange-200/50 z-40" />
 
             </div>
 
-            {/* INDICADOR DE ACCIÓN COMPACTO */}
-            <div className="mt-2 w-full h-14">
+            {/* INDICADOR DE ACCIÓN */}
+            <div className="mt-1 w-full h-10">
               {accionPendiente ? (
-                <div className="bg-yellow-50 border-2 border-yellow-400 px-2 py-1 rounded-xl text-center shadow-sm animate-pulse h-full flex flex-col justify-center">
-                  <p className="text-yellow-800 font-black text-xs uppercase">
-                    {accionPendiente === 't3' ? '🔥 TRIPLE (3 PTS)' : accionPendiente === 'd2' ? '🏀 DOBLE (2 PTS)' : '🎯 TIRO LIBRE (1 PT)'}
+                <div className={`${modoOperacion === 'sumar' ? 'bg-yellow-50 border-yellow-400 text-yellow-800' : 'bg-red-50 border-red-500 text-red-800'} border px-1.5 py-0.5 rounded-lg text-center shadow-sm animate-pulse h-full flex flex-col justify-center`}>
+                  <p className="font-black text-[10px] uppercase">
+                    {accionPendiente === 't3' ? '🔥 TRIPLE (3 PTS)' : accionPendiente === 'd2' ? '🏀 DOBLE (2 PTS)' : '🎯 TIRO LIBRE (1 PT)'} ({modoOperacion === 'sumar' ? 'SUMAR' : 'RESTAR'})
                   </p>
-                  <p className="text-yellow-700 font-bold text-[9px]">¡Toca la camiseta del jugador!</p>
+                  <p className="font-bold text-[7.5px]">¡Toca la camiseta del jugador!</p>
                 </div>
               ) : (
-                <div className="bg-gray-50 border border-gray-200 px-2 py-1 rounded-xl text-center h-full flex flex-col justify-center">
-                  <p className="text-gray-500 font-bold text-xs">Esperando zona de lanzamiento...</p>
+                <div className="bg-gray-50 border border-gray-200 px-1.5 py-0.5 rounded-lg text-center h-full flex flex-col justify-center">
+                  <p className="text-gray-500 font-bold text-[9px]">Modo: <span className={modoOperacion === 'sumar' ? 'text-green-600 font-black' : 'text-red-600 font-black'}>{modoOperacion === 'sumar' ? 'SUMANDO' : 'RESTANDO'}</span></p>
                 </div>
               )}
             </div>
           </div>
         </div>
 
-        {/* COLUMNA DERECHA: VISITANTE EN CANCHA (Ocupa el alto exacto) */}
-        <div className="w-full lg:w-1/4 bg-red-50/50 rounded-2xl p-2.5 border-2 border-red-100 shadow-inner order-3 flex flex-col justify-between">
-          <div className="w-full flex justify-between items-center mb-1 border-b-2 border-red-200 pb-1">
-            <span className="font-black text-red-800 text-[11px] uppercase">Visita En Cancha</span>
-            <span className="text-[9px] bg-red-600 text-white px-2 py-0.5 rounded-lg">{canchaVisitante.length}/5</span>
+        {/* COLUMNA DERECHA: EQUIPO VISITANTE EN CANCHA */}
+        <div className="w-full lg:w-1/4 bg-red-50/50 rounded-xl p-1.5 border-2 border-red-100 shadow-inner order-3 flex flex-col justify-between">
+          <div className="w-full flex justify-between items-center mb-0.5 border-b border-red-200 pb-0.5">
+            <span className="font-black text-red-800 text-[9px] uppercase tracking-wide truncate max-w-[75%]">
+              {partido?.visitante?.nombre || 'Visita'}
+            </span>
+            <span className="text-[7.5px] bg-red-600 text-white px-1 py-0.2 rounded">{canchaVisitante.length}/5</span>
           </div>
           
-          <div className="flex flex-row lg:flex-col justify-between items-center gap-1 w-full flex-1 my-1">
+          <div className="flex flex-row lg:flex-col justify-between items-center gap-0.5 w-full flex-1 my-0.5">
             {canchaVisitante.map(jugador => (
               <JugadorCancha key={jugador.id} jugador={jugador} equipo={partido.equipo_visitante_id} tipoEquipo="visitante" />
             ))}
@@ -421,9 +474,9 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
 
           <button 
             onClick={() => setModalBanca('visitante')}
-            className="w-full bg-red-600 hover:bg-red-700 text-white text-[11px] font-black py-1.5 px-2 rounded-xl shadow transition-all uppercase tracking-wide flex items-center justify-center gap-1 mt-1"
+            className="w-full bg-red-600 hover:bg-red-700 text-white text-[9px] font-black py-1 px-1.5 rounded-lg shadow transition-all uppercase tracking-wide flex items-center justify-center gap-1 mt-0.5"
           >
-            🔄 Sustituciones Banca ({bancaVisitante.length})
+            🔄 Banca ({bancaVisitante.length})
           </button>
         </div>
 
@@ -490,8 +543,8 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
       )}
 
       {/* Botón Finalizar Partido */}
-      <div className="flex justify-center mt-4 mb-2">
-        <button onClick={finalizarPartido} className="bg-gray-900 hover:bg-black text-white font-black px-6 py-2.5 rounded-xl shadow-xl transition-all uppercase tracking-widest text-xs border-b-4 border-gray-700 active:border-b-0">
+      <div className="flex justify-center mt-1">
+        <button onClick={finalizarPartido} className="bg-gray-900 hover:bg-black text-white font-black px-3 py-1.5 rounded-lg shadow-md transition-all uppercase tracking-widest text-[9px] border-b-2 border-gray-700 active:border-b-0">
           Pitar Final del Partido
         </button>
       </div>
