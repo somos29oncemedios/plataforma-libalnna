@@ -11,7 +11,16 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
   const [cargando, setCargando] = useState(true);
   const [editandoDespuesDeFinalizar, setEditandoDespuesDeFinalizar] = useState(false);
 
-  // 🏀 ESTADOS PARA DIVIDIR CANCHA Y BANCA
+  // 🏀 ROSTERS COMPLETOS DEL PARTIDO (Filtrados por categoría)
+  const [rosterLocalCompleto, setRosterLocalCompleto] = useState<any[]>([]);
+  const [rosterVisitanteCompleto, setRosterVisitanteCompleto] = useState<any[]>([]);
+
+  // 🏀 FASE 0: SELECCIÓN DEL QUINTETO INICIAL
+  const [seleccionInicial, setSeleccionInicial] = useState(true);
+  const [selLocal, setSelLocal] = useState<any[]>([]);
+  const [selVisitante, setSelVisitante] = useState<any[]>([]);
+
+  // 🏀 ESTADOS PARA DIVIDIR CANCHA Y BANCA (Durante el juego)
   const [canchaLocal, setCanchaLocal] = useState<any[]>([]);
   const [bancaLocal, setBancaLocal] = useState<any[]>([]);
   const [canchaVisitante, setCanchaVisitante] = useState<any[]>([]);
@@ -34,6 +43,7 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
     if (partidoData) {
       setPartido(partidoData);
 
+      // 🏀 TÁCTICA CORREGIDA: Traemos a TODOS los jugadores de ambos equipos primero
       const { data: jugadoresData } = await supabase
         .from('jugadores')
         .select('*')
@@ -41,14 +51,21 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
         .order('numero', { ascending: true });
 
       if (jugadoresData) {
-        const localTeam = jugadoresData.filter((j: any) => j.equipo_id === partidoData.equipo_local_id);
-        const visitorTeam = jugadoresData.filter((j: any) => j.equipo_id === partidoData.equipo_visitante_id);
+        // 🏀 FILTRO FRONTEND: Verificamos si la categoría del partido está dentro del "arreglo de categorías" del jugador
+        const jugadoresFiltrados = jugadoresData.filter((j: any) => {
+          if (!partidoData.categoria) return true; // Si el partido no tiene categoría, pasan todos
+          
+          if (Array.isArray(j.categorias)) {
+            return j.categorias.includes(partidoData.categoria);
+          }
+          return j.categoria === partidoData.categoria;
+        });
 
-        setCanchaLocal(localTeam.slice(0, 5));
-        setBancaLocal(localTeam.slice(5));
+        const localTeam = jugadoresFiltrados.filter((j: any) => j.equipo_id === partidoData.equipo_local_id);
+        const visitorTeam = jugadoresFiltrados.filter((j: any) => j.equipo_id === partidoData.equipo_visitante_id);
 
-        setCanchaVisitante(visitorTeam.slice(0, 5));
-        setBancaVisitante(visitorTeam.slice(5));
+        setRosterLocalCompleto(localTeam);
+        setRosterVisitanteCompleto(visitorTeam);
       }
 
       const { data: statsData } = await supabase
@@ -70,6 +87,41 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
   useEffect(() => {
     cargarPartido();
   }, [id]);
+
+  // 🏀 FASE 0: FUNCIONES PARA SELECCIONAR A LOS 5 INICIALES
+  const toggleSelLocal = (jugador: any) => {
+    if (selLocal.find(s => s.id === jugador.id)) {
+      setSelLocal(selLocal.filter(s => s.id !== jugador.id));
+    } else if (selLocal.length < 5) {
+      setSelLocal([...selLocal, jugador]);
+    }
+  };
+
+  const toggleSelVisitante = (jugador: any) => {
+    if (selVisitante.find(s => s.id === jugador.id)) {
+      setSelVisitante(selVisitante.filter(s => s.id !== jugador.id));
+    } else if (selVisitante.length < 5) {
+      setSelVisitante([...selVisitante, jugador]);
+    }
+  };
+
+  const confirmarQuintetos = async () => {
+    setCanchaLocal(selLocal);
+    setBancaLocal(rosterLocalCompleto.filter(j => !selLocal.find(s => s.id === j.id)));
+    
+    setCanchaVisitante(selVisitante);
+    setBancaVisitante(rosterVisitanteCompleto.filter(j => !selVisitante.find(s => s.id === j.id)));
+    
+    setSeleccionInicial(false); // Cierra la pantalla inicial y muestra la cancha
+
+    // Si el partido estaba programado, lo pasamos a "en curso" automáticamente
+    if (partido?.estado === 'programado') {
+      await supabase.from('partidos').update({ estado: 'en curso' }).eq('id', id);
+      setPartido({ ...partido, estado: 'en curso' });
+    }
+  };
+
+  // ----- LÓGICA DE JUEGO PRINCIPAL -----
 
   const partidoBloqueado = partido?.estado === 'finalizado' && !editandoDespuesDeFinalizar;
 
@@ -244,6 +296,93 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
 
   if (cargando) return <div className="text-center py-20 font-bold text-gray-500">Preparando la Mesa Técnica...</div>;
 
+  // 🏀 RENDER FASE 0: PANTALLA DE SELECCIÓN INICIAL
+  if (seleccionInicial) {
+    const isLocalReady = selLocal.length === Math.min(5, rosterLocalCompleto.length);
+    const isVisitaReady = selVisitante.length === Math.min(5, rosterVisitanteCompleto.length);
+
+    return (
+      <main className="container mx-auto py-8 px-4 max-w-5xl">
+        <div className="bg-white rounded-3xl p-6 md:p-10 shadow-2xl border-2 border-gray-100">
+          <div className="text-center mb-8">
+            <span className="bg-blue-100 text-blue-800 text-xs font-black px-3 py-1 rounded-full tracking-widest uppercase">Paso Previo</span>
+            <h1 className="text-2xl md:text-4xl font-black text-gray-900 uppercase tracking-tight mt-3">
+              Quintetos Iniciales
+            </h1>
+            <p className="text-gray-500 font-bold mt-2 text-sm md:text-base">
+              Selecciona a los 5 jugadores que entrarán a la duela por cada equipo.
+            </p>
+            <p className="text-blue-600 font-black mt-2 bg-blue-50 py-2 rounded-lg">
+              Categoría Oficial: {partido?.categoria || "General"}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* LOCAL */}
+            <div className="bg-blue-50/50 p-4 md:p-6 rounded-2xl border-2 border-blue-200 shadow-inner">
+              <h2 className="text-lg md:text-xl font-black text-blue-900 mb-4 uppercase text-center border-b-2 border-blue-200 pb-2">
+                {partido?.local?.nombre} <br/> <span className="text-sm text-blue-600">({selLocal.length}/5)</span>
+              </h2>
+              {rosterLocalCompleto.length === 0 ? (
+                <p className="text-center text-xs font-bold text-red-500 bg-white p-4 rounded-xl shadow-sm border border-red-200">
+                  ¡Atención! Este equipo no tiene jugadores registrados en la categoría {partido?.categoria}.
+                </p>
+              ) : (
+                <div className="flex flex-col gap-2 max-h-[50vh] overflow-y-auto pr-1">
+                  {rosterLocalCompleto.map(j => {
+                    const isSel = selLocal.find(s => s.id === j.id);
+                    return (
+                      <button key={j.id} onClick={() => toggleSelLocal(j)} className={`p-3 rounded-xl border-2 flex justify-between items-center transition-all ${isSel ? 'bg-blue-600 text-white border-blue-700 shadow-md' : 'bg-white text-gray-800 border-gray-200 hover:border-blue-300'}`}>
+                        <span className="font-bold text-sm">#{j.numero} - {j.nombre}</span>
+                        {isSel ? <span className="text-lg">✅</span> : <span className="w-5 h-5 border-2 border-gray-300 rounded-md"></span>}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* VISITANTE */}
+            <div className="bg-red-50/50 p-4 md:p-6 rounded-2xl border-2 border-red-200 shadow-inner">
+              <h2 className="text-lg md:text-xl font-black text-red-900 mb-4 uppercase text-center border-b-2 border-red-200 pb-2">
+                {partido?.visitante?.nombre} <br/> <span className="text-sm text-red-600">({selVisitante.length}/5)</span>
+              </h2>
+              {rosterVisitanteCompleto.length === 0 ? (
+                <p className="text-center text-xs font-bold text-red-500 bg-white p-4 rounded-xl shadow-sm border border-red-200">
+                  ¡Atención! Este equipo no tiene jugadores registrados en la categoría {partido?.categoria}.
+                </p>
+              ) : (
+                <div className="flex flex-col gap-2 max-h-[50vh] overflow-y-auto pr-1">
+                  {rosterVisitanteCompleto.map(j => {
+                    const isSel = selVisitante.find(s => s.id === j.id);
+                    return (
+                      <button key={j.id} onClick={() => toggleSelVisitante(j)} className={`p-3 rounded-xl border-2 flex justify-between items-center transition-all ${isSel ? 'bg-red-600 text-white border-red-700 shadow-md' : 'bg-white text-gray-800 border-gray-200 hover:border-red-300'}`}>
+                        <span className="font-bold text-sm">#{j.numero} - {j.nombre}</span>
+                        {isSel ? <span className="text-lg">✅</span> : <span className="w-5 h-5 border-2 border-gray-300 rounded-md"></span>}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-8 flex justify-center">
+            <button
+              disabled={(!isLocalReady && rosterLocalCompleto.length >= 5) || (!isVisitaReady && rosterVisitanteCompleto.length >= 5)}
+              onClick={confirmarQuintetos}
+              className="bg-gray-900 hover:bg-black text-white px-8 py-4 rounded-xl font-black uppercase tracking-widest shadow-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            >
+              Confirmar e Ir a la Cancha 🏀
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  // 🏀 RENDER FASE 1: MESA TÉCNICA PRINCIPAL (Cancha)
+
   const JugadorCancha = ({ jugador, equipo, tipoEquipo }: { jugador: any, equipo: string, tipoEquipo: 'local'|'visitante' }) => {
     const stats = estadisticas?.[jugador.id] || { puntos_totales: 0, tiros_libres_anotados: 0, triples_anotados: 0 };
     return (
@@ -277,7 +416,7 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
 
   return (
     <main className="container mx-auto py-1 px-1 max-w-[1400px]">
-      {/* MARCADOR GLOBAL EN VIVO CON BOTONES DE PERÍODO INTEGRADOS */}
+      {/* MARCADOR GLOBAL EN VIVO */}
       <div className="bg-gray-900 rounded-xl p-2 mb-1.5 shadow-xl text-white flex flex-col md:flex-row justify-between items-center gap-1.5">
         
         {/* EQUIPO LOCAL */}
@@ -294,7 +433,6 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
             <span className="text-lg md:text-2xl font-black text-yellow-400">{scoreVisitante}</span>
           </div>
           
-          {/* Botones de Control de Período */}
           <div className="flex items-center gap-1 bg-gray-900/80 p-0.5 rounded-lg border border-gray-700">
             {['1Q', '2Q', '3Q', '4Q', 'Extra'].map(q => (
               <button
@@ -399,11 +537,12 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
                  onClick={(e) => { e.stopPropagation(); setAccionPendiente('d2'); }}
                ></div>
 
+               {/* CÍRCULO TIRO LIBRE IZQUIERDO (AUMENTADO A w-14 h-14 en PC y w-9 h-9 en Móvil) */}
                <div 
-                 className={`absolute top-1/2 left-[25%] w-5 h-5 md:w-8 md:h-8 border-2 border-white rounded-full -translate-y-1/2 -translate-x-1/2 cursor-pointer flex items-center justify-center transition-colors duration-200 z-30 ${accionPendiente === 'tl' ? (modoOperacion === 'sumar' ? 'bg-yellow-400' : 'bg-red-500') : 'bg-red-600 hover:bg-red-500'}`}
+                 className={`absolute top-1/2 left-[25%] w-9 h-9 md:w-14 md:h-14 border-[3px] border-white rounded-full -translate-y-1/2 -translate-x-1/2 cursor-pointer flex items-center justify-center transition-colors duration-200 z-30 ${accionPendiente === 'tl' ? (modoOperacion === 'sumar' ? 'bg-yellow-400' : 'bg-red-500') : 'bg-red-600 hover:bg-red-500'}`}
                  onClick={(e) => { e.stopPropagation(); setAccionPendiente('tl'); }}
                >
-                 <span className={`font-black text-[5.5px] md:text-[8px] pointer-events-none transition-colors ${accionPendiente === 'tl' ? 'text-gray-900' : 'text-white'}`}>1 PT</span>
+                 <span className={`font-black text-[7px] md:text-[10px] pointer-events-none transition-colors ${accionPendiente === 'tl' ? 'text-gray-900' : 'text-white'}`}>1 PT</span>
                </div>
                
                <div className="absolute top-1/2 left-2 w-2 h-2 md:w-3 md:h-3 border border-orange-400 rounded-full -translate-y-1/2 pointer-events-none bg-orange-200/50 z-40" />
@@ -428,11 +567,12 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
                  onClick={(e) => { e.stopPropagation(); setAccionPendiente('d2'); }}
                ></div>
 
+               {/* CÍRCULO TIRO LIBRE DERECHO (AUMENTADO A w-14 h-14 en PC y w-9 h-9 en Móvil) */}
                <div 
-                 className={`absolute top-1/2 right-[25%] w-5 h-5 md:w-8 md:h-8 border-2 border-white rounded-full -translate-y-1/2 translate-x-1/2 cursor-pointer flex items-center justify-center transition-colors duration-200 z-30 ${accionPendiente === 'tl' ? (modoOperacion === 'sumar' ? 'bg-yellow-400' : 'bg-red-500') : 'bg-red-600 hover:bg-red-500'}`}
+                 className={`absolute top-1/2 right-[25%] w-9 h-9 md:w-14 md:h-14 border-[3px] border-white rounded-full -translate-y-1/2 translate-x-1/2 cursor-pointer flex items-center justify-center transition-colors duration-200 z-30 ${accionPendiente === 'tl' ? (modoOperacion === 'sumar' ? 'bg-yellow-400' : 'bg-red-500') : 'bg-red-600 hover:bg-red-500'}`}
                  onClick={(e) => { e.stopPropagation(); setAccionPendiente('tl'); }}
                >
-                 <span className={`font-black text-[5.5px] md:text-[8px] pointer-events-none transition-colors ${accionPendiente === 'tl' ? 'text-gray-900' : 'text-white'}`}>1 PT</span>
+                 <span className={`font-black text-[7px] md:text-[10px] pointer-events-none transition-colors ${accionPendiente === 'tl' ? 'text-gray-900' : 'text-white'}`}>1 PT</span>
                </div>
 
                <div className="absolute top-1/2 right-2 w-2 h-2 md:w-3 md:h-3 border border-orange-400 rounded-full -translate-y-1/2 pointer-events-none bg-orange-200/50 z-40" />
