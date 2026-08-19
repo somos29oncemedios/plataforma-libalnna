@@ -334,8 +334,11 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* LOCAL */}
             <div className="bg-blue-50/50 p-4 md:p-6 rounded-2xl border-2 border-blue-200 shadow-inner">
-              <h2 className="text-lg md:text-xl font-black text-blue-900 mb-4 uppercase text-center border-b-2 border-blue-200 pb-2">
-                {partido?.local?.nombre} <br/> <span className="text-sm text-blue-600">({selLocal.length}/5)</span>
+              <h2 className="text-lg md:text-xl font-black text-blue-900 mb-4 uppercase text-center border-b-2 border-blue-200 pb-2 flex flex-col items-center gap-2">
+                <div className="w-12 h-12 bg-white rounded-full p-1 border shadow-sm flex items-center justify-center overflow-hidden">
+                  {partido?.local?.logo_url ? <img src={partido.local.logo_url} alt="Local" className="w-full h-full object-contain" /> : <span className="text-gray-800 font-black">{partido?.local?.nombre?.charAt(0)}</span>}
+                </div>
+                <span>{partido?.local?.nombre} <span className="text-sm text-blue-600">({selLocal.length}/5)</span></span>
               </h2>
               {rosterLocalCompleto.length === 0 ? (
                 <p className="text-center text-xs font-bold text-red-500 bg-white p-4 rounded-xl shadow-sm border border-red-200">
@@ -358,8 +361,11 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
 
             {/* VISITANTE */}
             <div className="bg-red-50/50 p-4 md:p-6 rounded-2xl border-2 border-red-200 shadow-inner">
-              <h2 className="text-lg md:text-xl font-black text-red-900 mb-4 uppercase text-center border-b-2 border-red-200 pb-2">
-                {partido?.visitante?.nombre} <br/> <span className="text-sm text-red-600">({selVisitante.length}/5)</span>
+              <h2 className="text-lg md:text-xl font-black text-red-900 mb-4 uppercase text-center border-b-2 border-red-200 pb-2 flex flex-col items-center gap-2">
+                <div className="w-12 h-12 bg-white rounded-full p-1 border shadow-sm flex items-center justify-center overflow-hidden">
+                  {partido?.visitante?.logo_url ? <img src={partido.visitante.logo_url} alt="Visita" className="w-full h-full object-contain" /> : <span className="text-gray-800 font-black">{partido?.visitante?.nombre?.charAt(0)}</span>}
+                </div>
+                <span>{partido?.visitante?.nombre} <span className="text-sm text-red-600">({selVisitante.length}/5)</span></span>
               </h2>
               {rosterVisitanteCompleto.length === 0 ? (
                 <p className="text-center text-xs font-bold text-red-500 bg-white p-4 rounded-xl shadow-sm border border-red-200">
@@ -410,28 +416,28 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
   const JugadorCancha = ({ jugador, equipo, tipoEquipo }: { jugador: any, equipo: string, tipoEquipo: 'local'|'visitante' }) => {
     const stats = estadisticas?.[jugador.id] || { puntos_totales: 0, tiros_libres_anotados: 0, triples_anotados: 0 };
     return (
-      <div className={`flex flex-col items-center bg-white p-1 rounded-lg border-2 shadow-sm relative w-[18%] lg:w-full transition-all ${accionPendiente ? (modoOperacion === 'sumar' ? 'border-yellow-400 scale-105 shadow-yellow-200' : 'border-red-500 scale-105 shadow-red-200 animate-pulse') : 'border-gray-200'}`}>
+      <div className={`flex flex-col items-center bg-white p-1 lg:p-1.5 rounded-lg border-2 shadow-sm relative w-[18%] lg:w-[46%] lg:max-w-[130px] transition-all ${accionPendiente ? (modoOperacion === 'sumar' ? 'border-yellow-400 scale-105 shadow-yellow-200' : 'border-red-500 scale-105 shadow-red-200 animate-pulse') : 'border-gray-200'}`}>
         <button 
           onClick={() => clickCamisetaJugador(jugador, equipo)}
-          className={`w-7 h-7 md:w-9 md:h-9 rounded-full flex items-center justify-center font-black text-xs md:text-sm shadow-md transition-transform hover:scale-110 mb-0.5 ${tipoEquipo === 'local' ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-red-600 text-white hover:bg-red-500'} ${accionPendiente ? (modoOperacion === 'sumar' ? 'ring-2 ring-yellow-400' : 'ring-2 ring-red-500 bg-red-700') : ''}`}
+          className={`w-7 h-7 md:w-9 md:h-9 lg:w-10 lg:h-10 rounded-full flex items-center justify-center font-black text-xs md:text-sm lg:text-base shadow-md transition-transform hover:scale-110 mb-0.5 ${tipoEquipo === 'local' ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-red-600 text-white hover:bg-red-500'} ${accionPendiente ? (modoOperacion === 'sumar' ? 'ring-2 ring-yellow-400' : 'ring-2 ring-red-500 bg-red-700') : ''}`}
         >
           {jugador.numero}
         </button>
-        <span className="text-[6px] md:text-[7px] font-black uppercase text-gray-800 text-center leading-tight truncate w-full mb-0.5">{jugador.nombre}</span>
+        <span className="text-[6px] md:text-[7px] lg:text-[9px] font-black uppercase text-gray-800 text-center leading-tight truncate w-full mb-0.5 lg:mb-1">{jugador.nombre}</span>
         
-        <div className="w-full bg-gray-50 border border-gray-100 rounded flex flex-col p-0.5 text-[5px] md:text-[6.5px] gap-0.1">
-          <div className="flex justify-between font-black text-blue-700 border-b border-gray-200 pb-0.1 mb-0.1">
-            <span>PTS</span> <span>{stats.puntos_totales || 0}</span>
+        <div className="w-full bg-gray-50 border border-gray-100 rounded flex flex-col p-0.5 lg:p-1 text-[5px] md:text-[6.5px] lg:text-[8px] gap-0.1 lg:gap-0.5">
+          <div className="flex justify-between items-center font-black text-blue-700 border-b border-gray-200 pb-0.1 lg:pb-0.5 mb-0.1 lg:mb-0.5">
+            <span>PTS</span> <span className="text-[7px] md:text-[10px] lg:text-[13px]">{stats.puntos_totales || 0}</span>
           </div>
-          <div className="flex justify-between font-bold text-gray-500">
-            <span>3P</span> <span>{stats.triples_anotados || 0}</span>
+          <div className="flex justify-between items-center font-bold text-gray-500">
+            <span>3P</span> <span className="text-[6px] md:text-[8px] lg:text-[11px]">{stats.triples_anotados || 0}</span>
           </div>
-          <div className="flex justify-between font-bold text-gray-500">
-            <span>TL</span> <span>{stats.tiros_libres_anotados || 0}</span>
+          <div className="flex justify-between items-center font-bold text-gray-500">
+            <span>TL</span> <span className="text-[6px] md:text-[8px] lg:text-[11px]">{stats.tiros_libres_anotados || 0}</span>
           </div>
         </div>
 
-        <button onClick={() => sustituirJugador(jugador, tipoEquipo, 'salir')} className="mt-0.5 text-[5px] md:text-[6.5px] bg-gray-100 hover:bg-gray-200 text-gray-700 px-0.5 py-0.2 rounded font-bold w-full">
+        <button onClick={() => sustituirJugador(jugador, tipoEquipo, 'salir')} className="mt-0.5 lg:mt-1 text-[5px] md:text-[6.5px] lg:text-[8px] bg-gray-100 hover:bg-gray-200 text-gray-700 px-0.5 lg:px-1 py-0.2 lg:py-0.5 rounded font-bold w-full">
           ⬇️ Salir
         </button>
       </div>
@@ -440,12 +446,19 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
 
   return (
     <main className="container mx-auto py-1 px-1 max-w-[1400px]">
-      {/* MARCADOR GLOBAL EN VIVO */}
+      {/* MARCADOR GLOBAL EN VIVO (Con Logos Agregados) */}
       <div className="bg-gray-900 rounded-xl p-2 mb-1.5 shadow-xl text-white flex flex-col md:flex-row justify-between items-center gap-1.5">
         
         {/* EQUIPO LOCAL */}
         <div className="flex flex-col items-center md:w-1/3">
-          <span className="text-[8px] font-bold text-blue-400 tracking-wider">LOCAL</span>
+          <span className="text-[8px] font-bold text-blue-400 tracking-wider mb-1">LOCAL</span>
+          <div className="w-8 h-8 md:w-10 md:h-10 bg-white rounded-full flex items-center justify-center shrink-0 mb-1 overflow-hidden border border-gray-600 shadow-sm">
+            {partido?.local?.logo_url ? (
+              <img src={partido.local.logo_url} alt={partido.local.nombre} className="w-full h-full object-contain p-0.5" />
+            ) : (
+              <span className="text-gray-900 font-black text-xs">{partido?.local?.nombre?.charAt(0) || 'L'}</span>
+            )}
+          </div>
           <h2 className="text-xs md:text-base font-black uppercase text-center line-clamp-1">{partido?.local?.nombre}</h2>
         </div>
 
@@ -476,7 +489,14 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
 
         {/* EQUIPO VISITANTE */}
         <div className="flex flex-col items-center md:w-1/3">
-          <span className="text-[8px] font-bold text-red-400 tracking-wider">VISITANTE</span>
+          <span className="text-[8px] font-bold text-red-400 tracking-wider mb-1">VISITANTE</span>
+          <div className="w-8 h-8 md:w-10 md:h-10 bg-white rounded-full flex items-center justify-center shrink-0 mb-1 overflow-hidden border border-gray-600 shadow-sm">
+            {partido?.visitante?.logo_url ? (
+              <img src={partido.visitante.logo_url} alt={partido.visitante.nombre} className="w-full h-full object-contain p-0.5" />
+            ) : (
+              <span className="text-gray-900 font-black text-xs">{partido?.visitante?.nombre?.charAt(0) || 'V'}</span>
+            )}
+          </div>
           <h2 className="text-xs md:text-base font-black uppercase text-center line-clamp-1">{partido?.visitante?.nombre}</h2>
         </div>
 
@@ -501,19 +521,19 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
         </div>
       </div>
 
-      {/* LAYOUT DE 3 COLUMNAS MÁS JUNTO */}
-      <div className="flex flex-col lg:flex-row gap-1.5 mb-1.5 items-stretch">
+      {/* LAYOUT DE 3 COLUMNAS: LATERALES 22%, CANCHA 56% PARA ACOMODAR LAS TARJETAS 2,2,1 */}
+      <div className="flex flex-col lg:flex-row gap-1.5 mb-1.5 items-stretch lg:justify-center">
         
         {/* COLUMNA IZQUIERDA: EQUIPO LOCAL EN CANCHA */}
-        <div className="w-full lg:w-1/4 bg-blue-50/50 rounded-xl p-1.5 border-2 border-blue-100 shadow-inner order-2 lg:order-1 flex flex-col justify-between">
+        <div className="w-full lg:w-[22%] lg:min-w-[180px] bg-blue-50/50 rounded-xl p-1.5 lg:p-2 border-2 border-blue-100 shadow-inner order-2 lg:order-1 flex flex-col justify-start">
           <div className="w-full flex justify-between items-center mb-0.5 border-b border-blue-200 pb-0.5">
-            <span className="font-black text-blue-800 text-[9px] uppercase tracking-wide truncate max-w-[75%]">
+            <span className="font-black text-blue-800 text-[9px] lg:text-[11px] uppercase tracking-wide truncate max-w-[75%]">
               {partido?.local?.nombre || 'Local'}
             </span>
             <span className="text-[7.5px] bg-blue-600 text-white px-1 py-0.2 rounded">{canchaLocal.length}/5</span>
           </div>
           
-          <div className="flex flex-row lg:flex-col justify-between items-center gap-0.5 w-full flex-1 my-0.5">
+          <div className="flex flex-row lg:flex-wrap justify-between lg:justify-center items-center gap-0.5 lg:gap-1.5 w-full flex-1 my-0.5 lg:my-2">
             {canchaLocal.map(jugador => (
               <JugadorCancha key={jugador.id} jugador={jugador} equipo={partido.equipo_local_id} tipoEquipo="local" />
             ))}
@@ -521,14 +541,14 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
 
           <button 
             onClick={() => setModalBanca('local')}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white text-[9px] font-black py-1 px-1.5 rounded-lg shadow transition-all uppercase tracking-wide flex items-center justify-center gap-1 mt-0.5"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white text-[9px] lg:text-[10px] font-black py-1 px-1.5 rounded-lg shadow transition-all uppercase tracking-wide flex items-center justify-center gap-1 mt-auto"
           >
             🔄 Banca ({bancaLocal.length})
           </button>
         </div>
 
-        {/* COLUMNA CENTRAL: CANCHA INTERACTIVA FULL COURT */}
-        <div className="w-full lg:w-2/4 flex flex-col items-center order-1 lg:order-2">
+        {/* COLUMNA CENTRAL: CANCHA INTERACTIVA FULL COURT (MÁS ANCHA: lg:w-[56%]) */}
+        <div className="w-full lg:w-[56%] flex flex-col items-center order-1 lg:order-2">
           <div className="bg-white rounded-xl p-1.5 w-full shadow-sm border-2 border-gray-200 flex flex-col items-center">
             <p className="text-[10px] md:text-xs font-black text-gray-800 uppercase mb-1 text-center">
               1. Toca la zona {modoOperacion === 'restar' ? 'para RESTAR' : 'para SUMAR'}
@@ -622,15 +642,15 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
         </div>
 
         {/* COLUMNA DERECHA: EQUIPO VISITANTE EN CANCHA */}
-        <div className="w-full lg:w-1/4 bg-red-50/50 rounded-xl p-1.5 border-2 border-red-100 shadow-inner order-3 flex flex-col justify-between">
+        <div className="w-full lg:w-[22%] lg:min-w-[180px] bg-red-50/50 rounded-xl p-1.5 lg:p-2 border-2 border-red-100 shadow-inner order-3 flex flex-col justify-start">
           <div className="w-full flex justify-between items-center mb-0.5 border-b border-red-200 pb-0.5">
-            <span className="font-black text-red-800 text-[9px] uppercase tracking-wide truncate max-w-[75%]">
+            <span className="font-black text-red-800 text-[9px] lg:text-[11px] uppercase tracking-wide truncate max-w-[75%]">
               {partido?.visitante?.nombre || 'Visita'}
             </span>
             <span className="text-[7.5px] bg-red-600 text-white px-1 py-0.2 rounded">{canchaVisitante.length}/5</span>
           </div>
           
-          <div className="flex flex-row lg:flex-col justify-between items-center gap-0.5 w-full flex-1 my-0.5">
+          <div className="flex flex-row lg:flex-wrap justify-between lg:justify-center items-center gap-0.5 lg:gap-1.5 w-full flex-1 my-0.5 lg:my-2">
             {canchaVisitante.map(jugador => (
               <JugadorCancha key={jugador.id} jugador={jugador} equipo={partido.equipo_visitante_id} tipoEquipo="visitante" />
             ))}
@@ -638,7 +658,7 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
 
           <button 
             onClick={() => setModalBanca('visitante')}
-            className="w-full bg-red-600 hover:bg-red-700 text-white text-[9px] font-black py-1 px-1.5 rounded-lg shadow transition-all uppercase tracking-wide flex items-center justify-center gap-1 mt-0.5"
+            className="w-full bg-red-600 hover:bg-red-700 text-white text-[9px] lg:text-[10px] font-black py-1 px-1.5 rounded-lg shadow transition-all uppercase tracking-wide flex items-center justify-center gap-1 mt-auto"
           >
             🔄 Banca ({bancaVisitante.length})
           </button>
