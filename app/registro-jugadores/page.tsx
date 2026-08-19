@@ -26,7 +26,7 @@ export default function RegistroJugadores() {
 
   const [editandoId, setEditandoId] = useState<string | null>(null);
 
-  // 🏀 NUEVO ESTADO: Puntos totales por jugador
+  // 🏀 ESTADO: Puntos totales por jugador
   const [puntosTotales, setPuntosTotales] = useState<any>({});
 
   const cargarDatos = async () => {
@@ -39,7 +39,6 @@ export default function RegistroJugadores() {
       .order('nombre', { ascending: true });
     if (jugData) setJugadores(jugData);
 
-    // 🏀 NUEVA JUGADA: Descargar estadísticas de box_scores y sumar los puntos
     const { data: statsData } = await supabase
       .from('box_scores')
       .select('jugador_id, puntos_totales');
@@ -275,9 +274,8 @@ export default function RegistroJugadores() {
         </div>
       </div>
 
-      {/* LISTA DE JUGADORES */}
+      {/* LISTA DE JUGADORES (ALINEADA Y UNIFORME) */}
       <div className="bg-white border border-gray-200 shadow-sm rounded-xl p-8">
-        {/* RENDERIZADO DE LA LISTA FILTRADA */}
         {jugadores.length === 0 ? (
           <p className="text-gray-500 italic text-center py-6">No hay jugadores registrados en la base de datos.</p>
         ) : jugadoresFiltrados.length === 0 ? (
@@ -285,10 +283,10 @@ export default function RegistroJugadores() {
         ) : (
           <div className="grid gap-4">
             {jugadoresFiltrados.map(jugador => (
-              <div key={jugador.id} className="flex flex-col md:flex-row justify-between items-center p-4 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors">
+              <div key={jugador.id} className="flex flex-col md:flex-row justify-between items-center p-4 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors gap-4">
                 
-                {/* Info y Foto */}
-                <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto text-center sm:text-left">
+                {/* 1. Info y Foto (Ocupa todo el espacio restante con flex-1) */}
+                <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:flex-1 text-center sm:text-left">
                   <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center shrink-0 overflow-hidden border-2 border-gray-300 shadow-sm">
                     {jugador.foto_url ? (
                       <img src={jugador.foto_url} alt={jugador.nombre} className="w-full h-full object-cover" />
@@ -296,26 +294,30 @@ export default function RegistroJugadores() {
                       <span className="text-gray-500 font-black text-xl">#{jugador.numero}</span>
                     )}
                   </div>
-                  <div>
-                    <p className="text-lg font-black text-gray-900">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-lg font-black text-gray-900 truncate">
                       {jugador.nombre} <span className="text-sm font-bold text-gray-500 ml-2">#{jugador.numero}</span>
                     </p>
-                    <p className="text-sm font-bold text-blue-600">{jugador.equipo?.nombre || 'Sin Equipo'}</p>
-                    <p className="text-xs font-semibold text-gray-500 mt-1">Cats: {jugador.categorias?.join(', ')}</p>
-                  </div>
-                  
-                  {/* 🏀 NUEVA JUGADA: Tarjeta de Puntos Totales */}
-                  <div className="bg-yellow-50 border border-yellow-300 px-5 py-2 rounded-xl flex flex-col items-center justify-center mt-3 sm:mt-0 sm:ml-4 shadow-sm min-w-[100px]">
-                    <span className="text-[10px] font-black text-yellow-800 uppercase tracking-wider">Total PTS</span>
-                    <span className="text-2xl font-black text-gray-900">{puntosTotales[jugador.id] || 0}</span>
+                    <p className="text-sm font-bold text-blue-600 truncate">{jugador.equipo?.nombre || 'Sin Equipo'}</p>
+                    <p className="text-xs font-semibold text-gray-500 mt-1 truncate">Cats: {jugador.categorias?.join(', ')}</p>
                   </div>
                 </div>
                 
-                {/* Botones de Acción */}
-                <div className="flex gap-2 w-full md:w-auto mt-4 md:mt-0">
-                  <button onClick={() => editarJugador(jugador)} className="bg-gray-800 hover:bg-gray-900 text-white font-bold px-6 py-2 rounded-md transition-colors w-full md:w-auto shadow-sm">Modificar</button>
-                  <button onClick={() => eliminarJugador(jugador.id)} className="bg-red-100 hover:bg-red-600 text-red-700 hover:text-white font-bold px-6 py-2 rounded-md transition-colors w-full md:w-auto shadow-sm">Eliminar</button>
+                {/* 2. Tarjeta de Puntos y Botones de Acción (Agrupados y alineados uniformemente) */}
+                <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
+                  {/* Tarjeta de Puntos Totales (Ancho fijo w-24) */}
+                  <div className="bg-yellow-50 border border-yellow-300 px-2 py-2 rounded-xl flex flex-col items-center justify-center shadow-sm w-24 shrink-0">
+                    <span className="text-[10px] font-black text-yellow-800 uppercase tracking-wider">Total PTS</span>
+                    <span className="text-2xl font-black text-gray-900">{puntosTotales[jugador.id] || 0}</span>
+                  </div>
+
+                  {/* Botones de Acción */}
+                  <div className="flex gap-2 w-full sm:w-auto">
+                    <button onClick={() => editarJugador(jugador)} className="bg-gray-800 hover:bg-gray-900 text-white font-bold px-4 py-2 rounded-md transition-colors w-full sm:w-auto shadow-sm">Modificar</button>
+                    <button onClick={() => eliminarJugador(jugador.id)} className="bg-red-100 hover:bg-red-600 text-red-700 hover:text-white font-bold px-4 py-2 rounded-md transition-colors w-full sm:w-auto shadow-sm">Eliminar</button>
+                  </div>
                 </div>
+
               </div>
             ))}
           </div>
