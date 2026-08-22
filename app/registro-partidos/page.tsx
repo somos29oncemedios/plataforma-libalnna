@@ -8,7 +8,7 @@ export default function PanelEmparejamientos() {
   
   const [categoriaActiva, setCategoriaActiva] = useState("U10");
   const [equipos, setEquipos] = useState<any[]>([]);
-  const [partidosTemporada, setPartidosTemporada] = useState<any[]>([]);
+  const [partidosTotales, setPartidosTotales] = useState<any[]>([]);
   const [cargando, setCargando] = useState(true);
 
   // Estado temporal para guardar lo que escribes en cada emparejamiento
@@ -17,14 +17,15 @@ export default function PanelEmparejamientos() {
   const cargarDatos = async () => {
     setCargando(true);
     
+    // 1. Traemos los equipos
     const { data: eqs } = await supabase.from('equipos').select('*').order('nombre');
     if (eqs) setEquipos(eqs);
 
+    // 2. Traemos TODOS los partidos (sin filtro estricto de fase para que no haya juegos fantasma)
     const { data: pts } = await supabase
       .from('partidos')
-      .select('*, local:equipos!equipo_local_id(nombre, logo_url), visitante:equipos!equipo_visitante_id(nombre, logo_url)')
-      .eq('fase_torneo', 'Temporada Regular');
-    if (pts) setPartidosTemporada(pts);
+      .select('*, local:equipos!equipo_local_id(nombre, logo_url), visitante:equipos!equipo_visitante_id(nombre, logo_url)');
+    if (pts) setPartidosTotales(pts);
 
     setCargando(false);
   };
@@ -33,7 +34,7 @@ export default function PanelEmparejamientos() {
     cargarDatos();
   }, []);
 
-  // 🏀 MOTOR DE GENERACIÓN INTELIGENTE (Simple vs Ida y Vuelta)
+  // 🏀 MOTOR DE GENERACIÓN Y LECTURA DIRECTA
   
   const equiposCategoria = equipos.filter(e => {
     if (Array.isArray(e.categorias)) return e.categorias.includes(categoriaActiva);
@@ -41,72 +42,58 @@ export default function PanelEmparejamientos() {
   });
 
   const isDobleRonda = categoriaActiva === "U16 Femenino" || categoriaActiva === "U16 Masculino";
-  const emparejamientosTotales = [];
+  
+  // A. Partidos reales que están en la Base de Datos para esta categoría
+  const partidosCategoria = partidosTotales.filter(p => p.categoria === categoriaActiva);
 
-  // Lógica de cruces matemáticos
+  // B. Clasificación Directa y Segura a las listas visuales
+  const programados = partidosCategoria.filter(p => p.estado !== 'finalizado');
+  const jugados = partidosCategoria.filter(p => p.estado === 'finalizado');
+
+  // C. Cálculo matemático de los emparejamientos ideales
+  const emparejamientosIdeales = [];
   for (let i = 0; i < equiposCategoria.length; i++) {
     for (let j = 0; j < equiposCategoria.length; j++) {
-      if (i === j) continue; // Un equipo no juega contra sí mismo
-
+      if (i === j) continue; 
       if (isDobleRonda) {
-        // Formato Doble: Agregamos A vs B y B vs A
-        emparejamientosTotales.push({
+        emparejamientosIdeales.push({
           id: `${equiposCategoria[i].id}-${equiposCategoria[j].id}`,
           local: equiposCategoria[i],
           visitante: equiposCategoria[j]
         });
-      } else {
-        // Formato Simple: Solo agregamos A vs B una vez
-        if (i < j) {
-          emparejamientosTotales.push({
-            id: `${equiposCategoria[i].id}-${equiposCategoria[j].id}`,
-            local: equiposCategoria[i],
-            visitante: equiposCategoria[j]
-          });
-        }
+      } else if (i < j) {
+        emparejamientosIdeales.push({
+          id: `${equiposCategoria[i].id}-${equiposCategoria[j].id}`,
+          local: equiposCategoria[i],
+          visitante: equiposCategoria[j]
+        });
       }
     }
   }
 
-  // Filtrar los partidos existentes de la categoría activa
-  const partidosCategoria = partidosTemporada.filter(p => p.categoria === categoriaActiva);
-
-  // Clasificadores oficiales
+  // D. Cálculo de "Pendientes": Emparejamientos Ideales MENOS los que ya existen en BD
   const pendientes: any[] = [];
-  const programados: any[] = [];
-  const jugados: any[] = [];
+  const partidosParaDescontar = [...partidosCategoria]; // Copia para no descontar el mismo partido 2 veces
 
-  // Copia mutable para ir descontando enfrentamientos
-  const partidosDisponibles = [...partidosCategoria];
-
-  emparejamientosTotales.forEach(emp => {
+  emparejamientosIdeales.forEach(emp => {
     let indexExistente = -1;
 
     if (isDobleRonda) {
-      // En ida y vuelta, buscamos exactamente la misma localía
-      indexExistente = partidosDisponibles.findIndex(p => 
+      indexExistente = partidosParaDescontar.findIndex(p => 
         p.equipo_local_id === emp.local.id && p.equipo_visitante_id === emp.visitante.id
       );
     } else {
-      // En ronda simple, el partido cuenta sin importar quién sea local
-      indexExistente = partidosDisponibles.findIndex(p => 
+      indexExistente = partidosParaDescontar.findIndex(p => 
         (p.equipo_local_id === emp.local.id && p.equipo_visitante_id === emp.visitante.id) ||
         (p.equipo_local_id === emp.visitante.id && p.equipo_visitante_id === emp.local.id)
       );
     }
 
     if (indexExistente !== -1) {
-      // El partido ya existe en la BD
-      const partidoExistente = partidosDisponibles[indexExistente];
-      partidosDisponibles.splice(indexExistente, 1); // Lo descontamos de la lista
-      
-      if (partidoExistente.estado === 'finalizado') {
-        jugados.push(partidoExistente);
-      } else {
-        programados.push(partidoExistente); // Incluye 'programado', 'en curso' y 'suspendido'
-      }
+      // El partido ya existe, lo sacamos de la lista para el cruce de pendientes
+      partidosParaDescontar.splice(indexExistente, 1);
     } else {
-      // Falta por agendar
+      // Si no se encontró en la base de datos, lo ponemos como pendiente
       pendientes.push(emp);
     }
   });
@@ -158,7 +145,7 @@ export default function PanelEmparejamientos() {
         delete nuevos[emparejamiento.id];
         return nuevos;
       });
-      cargarDatos();
+      cargarDatos(); // Recarga la info para actualizar los contadores
     }
   };
 
@@ -215,7 +202,7 @@ export default function PanelEmparejamientos() {
               <span className="text-4xl font-black text-yellow-600">{pendientes.length}</span>
             </div>
             <div className="bg-blue-50 border-2 border-blue-200 rounded-2xl p-4 flex flex-col items-center justify-center shadow-sm">
-              <span className="text-blue-800 font-black text-[10px] uppercase tracking-widest">Programados</span>
+              <span className="text-blue-800 font-black text-[10px] uppercase tracking-widest">Ya Programados</span>
               <span className="text-4xl font-black text-blue-600">{programados.length}</span>
             </div>
             <div className="bg-green-50 border-2 border-green-200 rounded-2xl p-4 flex flex-col items-center justify-center shadow-sm">
@@ -234,7 +221,7 @@ export default function PanelEmparejamientos() {
 
             {pendientes.length === 0 ? (
               <div className="bg-green-50 border border-green-200 text-green-700 p-6 rounded-xl text-center font-bold">
-                ✅ ¡Todo listo! Todos los cruces de la Temporada Regular en {categoriaActiva} ya tienen fecha.
+                ✅ ¡Todo listo! Todos los cruces ideales de la Temporada Regular en {categoriaActiva} ya existen en el sistema.
               </div>
             ) : (
               <div className="grid gap-4">
