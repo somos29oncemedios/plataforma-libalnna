@@ -14,7 +14,7 @@ export default function PanelEmparejamientos() {
   // Estados para agendar nuevos partidos
   const [borradores, setDrafts] = useState<any>({});
   
-  // 🔥 NUEVO ESTADO: Memoria para saber qué emparejamientos tienen la localía invertida
+  // Estado: Memoria para saber qué emparejamientos tienen la localía invertida
   const [equiposInvertidos, setEquiposInvertidos] = useState<{ [key: string]: boolean }>({});
 
   // Estados para REPROGRAMAR/EDITAR
@@ -28,10 +28,13 @@ export default function PanelEmparejamientos() {
     const { data: eqs } = await supabase.from('equipos').select('*').order('nombre');
     if (eqs) setEquipos(eqs);
 
-    // 2. Traemos TODOS los partidos
+    // 2. Traemos TODOS los partidos y los ordenamos cronológicamente desde la base de datos
     const { data: pts } = await supabase
       .from('partidos')
-      .select('*, local:equipos!equipo_local_id(nombre, logo_url), visitante:equipos!equipo_visitante_id(nombre, logo_url)');
+      .select('*, local:equipos!equipo_local_id(nombre, logo_url), visitante:equipos!equipo_visitante_id(nombre, logo_url)')
+      .order('fecha', { ascending: true })
+      .order('hora', { ascending: true });
+    
     if (pts) setPartidosTotales(pts);
 
     setCargando(false);
@@ -40,6 +43,40 @@ export default function PanelEmparejamientos() {
   useEffect(() => {
     cargarDatos();
   }, []);
+
+  // 🏀 UTILIDADES DE FORMATO Y AGRUPACIÓN
+  const formatearFecha = (fechaStr: string) => {
+    if (!fechaStr || fechaStr === "Fecha por definir") return "Fecha por definir";
+    const [year, month, day] = fechaStr.split('-');
+    if (!year || !month || !day) return fechaStr;
+    const dateObj = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    const diasSemana = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+    const nombreDia = diasSemana[dateObj.getDay()];
+    const meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+    const nombreMes = meses[parseInt(month, 10) - 1];
+    return `${nombreDia}, ${day} de ${nombreMes} de ${year}`;
+  };
+
+  const formatearHora = (horaStr: string) => {
+    if (!horaStr || horaStr === "Hora por definir") return "Hora por definir";
+    let [h, m] = horaStr.split(':');
+    if (!h || !m) return horaStr;
+    let horaNum = parseInt(h, 10);
+    const ampm = horaNum >= 12 ? 'PM' : 'AM';
+    horaNum = horaNum % 12 || 12;
+    return `${horaNum}:${m} ${ampm}`;
+  };
+
+  const agruparPartidos = (listaPartidos: any[]) => {
+    return listaPartidos.reduce((acc: any, partido) => {
+      const fecha = partido.fecha || "Fecha por definir";
+      const sede = partido.lugar || "Sede por definir";
+      if (!acc[fecha]) acc[fecha] = {};
+      if (!acc[fecha][sede]) acc[fecha][sede] = [];
+      acc[fecha][sede].push(partido);
+      return acc;
+    }, {});
+  };
 
   // 🏀 MOTOR DE GENERACIÓN Y LECTURA DIRECTA
   
@@ -50,14 +87,15 @@ export default function PanelEmparejamientos() {
 
   const isDobleRonda = categoriaActiva === "U16 Femenino" || categoriaActiva === "U16 Masculino";
   
-  // A. Partidos reales que están en la Base de Datos para esta categoría
   const partidosCategoria = partidosTotales.filter(p => p.categoria === categoriaActiva);
 
-  // B. Clasificación Directa y Segura a las listas visuales
   const programados = partidosCategoria.filter(p => p.estado !== 'finalizado');
   const jugados = partidosCategoria.filter(p => p.estado === 'finalizado');
 
-  // C. Cálculo matemático de los emparejamientos ideales
+  // Agrupamos las listas para la vista visual
+  const programadosAgrupados = agruparPartidos(programados);
+  const jugadosAgrupados = agruparPartidos(jugados);
+
   const emparejamientosIdeales = [];
   for (let i = 0; i < equiposCategoria.length; i++) {
     for (let j = 0; j < equiposCategoria.length; j++) {
@@ -78,7 +116,6 @@ export default function PanelEmparejamientos() {
     }
   }
 
-  // D. Cálculo de "Pendientes"
   const pendientes: any[] = [];
   const partidosParaDescontar = [...partidosCategoria];
 
@@ -115,7 +152,6 @@ export default function PanelEmparejamientos() {
     }));
   };
 
-  // 🔥 NUEVA FUNCIÓN: Intercambiar equipos
   const invertirLocalia = (id: string) => {
     setEquiposInvertidos(prev => ({
       ...prev,
@@ -131,7 +167,6 @@ export default function PanelEmparejamientos() {
       return;
     }
 
-    // Determinamos quién es finalmente local y visitante basándonos en el estado de inversión
     const isInvertido = equiposInvertidos[emparejamiento.id];
     const equipoLocalDefinitivo = isInvertido ? emparejamiento.visitante : emparejamiento.local;
     const equipoVisitanteDefinitivo = isInvertido ? emparejamiento.local : emparejamiento.visitante;
@@ -163,7 +198,6 @@ export default function PanelEmparejamientos() {
         delete nuevos[emparejamiento.id];
         return nuevos;
       });
-      // Limpiamos también el estado de inversión para ese ID
       setEquiposInvertidos((prev: any) => {
         const nuevos = { ...prev };
         delete nuevos[emparejamiento.id];
@@ -304,7 +338,6 @@ export default function PanelEmparejamientos() {
             ) : (
               <div className="grid gap-4">
                 {pendientes.map((emp) => {
-                  // Verificamos si este emparejamiento fue invertido por el usuario
                   const isInvertido = equiposInvertidos[emp.id] || false;
                   const localMostrar = isInvertido ? emp.visitante : emp.local;
                   const visitanteMostrar = isInvertido ? emp.local : emp.visitante;
@@ -319,7 +352,6 @@ export default function PanelEmparejamientos() {
                           <span className="font-black text-gray-900 text-xs text-center uppercase truncate w-full">{localMostrar.nombre}</span>
                         </div>
                         
-                        {/* 🔥 BOTÓN PARA INVERTIR LOCALÍA */}
                         <button 
                           onClick={() => invertirLocalia(emp.id)}
                           className="text-gray-400 hover:text-blue-600 font-black text-lg w-1/5 text-center transition-transform hover:scale-110 active:scale-95"
@@ -379,96 +411,87 @@ export default function PanelEmparejamientos() {
                 </h2>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 opacity-90">
-                {programados.map((partido: any) => (
-                  <div key={partido.id} className="bg-white border-2 border-gray-200 rounded-xl p-4 flex flex-col gap-3 shadow-sm hover:shadow-md transition-shadow relative">
+              <div className="flex flex-col gap-8 opacity-95">
+                {Object.entries(programadosAgrupados).map(([fecha, sedes]: [string, any]) => (
+                  <div key={fecha} className="flex flex-col gap-4 border-b border-gray-100 pb-6 last:border-0">
+                    <h3 className="text-lg font-black text-gray-900 uppercase flex items-center gap-2">
+                      📅 <span>{formatearFecha(fecha)}</span>
+                    </h3>
                     
-                    {/* Botones de Editar y Eliminar si está suspendido o programado */}
-                    {(partido.estado === 'programado' || partido.estado === 'suspendido') && partidoEditando !== partido.id && (
-                      <div className="absolute top-2 right-2 flex gap-1">
-                        <button 
-                          onClick={() => iniciarEdicion(partido)}
-                          className="text-gray-400 hover:text-blue-600 bg-gray-50 hover:bg-blue-50 p-1.5 rounded-md transition-colors"
-                          title="Modificar partido"
-                        >
-                          ✏️
-                        </button>
-                        <button 
-                          onClick={() => eliminarPartido(partido.id)}
-                          className="text-gray-400 hover:text-red-600 bg-gray-50 hover:bg-red-50 p-1.5 rounded-md transition-colors"
-                          title="Eliminar partido"
-                        >
-                          🗑️
-                        </button>
-                      </div>
-                    )}
-
-                    {/* MODO EDICIÓN */}
-                    {partidoEditando === partido.id ? (
-                      <div className="flex flex-col gap-3">
-                        <div className="flex justify-between items-center px-2 bg-gray-50 p-2 rounded-lg border border-gray-200 mb-2">
-                          <span className="font-black text-gray-900 text-[10px] uppercase truncate text-left">{partido.local?.nombre}</span>
-                          <span className="text-gray-400 font-black text-[10px] text-center px-2">VS</span>
-                          <span className="font-black text-gray-900 text-[10px] uppercase text-right truncate">{partido.visitante?.nombre}</span>
-                        </div>
-                        
-                        <input 
-                          type="date" 
-                          className="border border-gray-300 rounded-md p-1.5 text-xs font-bold focus:ring-2 focus:ring-blue-500"
-                          value={datosEdicion.fecha}
-                          onChange={(e) => setDatosEdicion({...datosEdicion, fecha: e.target.value})}
-                        />
-                        <div className="flex gap-2">
-                          <input 
-                            type="time" 
-                            className="w-1/2 border border-gray-300 rounded-md p-1.5 text-xs font-bold focus:ring-2 focus:ring-blue-500"
-                            value={datosEdicion.hora}
-                            onChange={(e) => setDatosEdicion({...datosEdicion, hora: e.target.value})}
-                          />
-                          <input 
-                            type="text" 
-                            placeholder="Sede"
-                            className="w-1/2 border border-gray-300 rounded-md p-1.5 text-xs font-bold focus:ring-2 focus:ring-blue-500"
-                            value={datosEdicion.lugar}
-                            onChange={(e) => setDatosEdicion({...datosEdicion, lugar: e.target.value})}
-                          />
-                        </div>
-
-                        <div className="flex gap-2 mt-2">
-                          <button onClick={cancelarEdicion} className="w-1/2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-black text-[10px] py-2 rounded-md uppercase">
-                            Cancelar
-                          </button>
-                          <button onClick={() => guardarEdicion(partido.id)} className="w-1/2 bg-blue-600 hover:bg-blue-700 text-white font-black text-[10px] py-2 rounded-md uppercase">
-                            Guardar
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      /* MODO VISTA NORMAL */
-                      <>
-                        <div className="flex justify-between items-center border-b border-gray-200 pb-2 pr-12">
-                          <span className="font-bold text-[10px] text-gray-500 uppercase tracking-widest">{partido.fecha}</span>
+                    <div className="flex flex-col gap-6 pl-2 md:pl-4">
+                      {Object.entries(sedes).map(([sede, partidosSede]: [string, any]) => (
+                        <div key={sede}>
+                          <h4 className="font-bold text-gray-700 uppercase mb-3 flex items-center gap-2 text-sm">
+                            📍 Sede: <span className="text-blue-600">{sede}</span>
+                          </h4>
                           
-                          {partido.estado === 'suspendido' ? (
-                            <span className="font-black text-[9px] bg-yellow-200 text-yellow-800 px-2 py-0.5 rounded uppercase">Suspendido</span>
-                          ) : partido.estado === 'en curso' ? (
-                            <span className="font-black text-[9px] bg-red-200 text-red-800 px-2 py-0.5 rounded uppercase animate-pulse">En Curso</span>
-                          ) : (
-                            <span className="font-bold text-[10px] bg-blue-100 text-blue-800 px-2 py-0.5 rounded">{partido.hora}</span>
-                          )}
-                        </div>
-                        
-                        <div className="flex justify-between items-center px-2 mt-1">
-                          <span className="font-black text-gray-900 text-xs uppercase w-[40%] truncate text-left">{partido.local?.nombre}</span>
-                          <span className="text-gray-400 font-black text-[10px] w-[20%] text-center">VS</span>
-                          <span className="font-black text-gray-900 text-xs uppercase w-[40%] text-right truncate">{partido.visitante?.nombre}</span>
-                        </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {partidosSede.map((partido: any) => (
+                              <div key={partido.id} className="bg-white border-2 border-gray-200 rounded-xl p-4 flex flex-col gap-3 shadow-sm hover:shadow-md transition-shadow relative">
+                                {/* Botones de Editar y Eliminar si está suspendido o programado */}
+                                {(partido.estado === 'programado' || partido.estado === 'suspendido') && partidoEditando !== partido.id && (
+                                  <div className="absolute top-2 right-2 flex gap-1 z-10">
+                                    <button 
+                                      onClick={() => iniciarEdicion(partido)}
+                                      className="text-gray-400 hover:text-blue-600 bg-gray-50 hover:bg-blue-50 p-1.5 rounded-md transition-colors"
+                                      title="Modificar partido"
+                                    >
+                                      ✏️
+                                    </button>
+                                    <button 
+                                      onClick={() => eliminarPartido(partido.id)}
+                                      className="text-gray-400 hover:text-red-600 bg-gray-50 hover:bg-red-50 p-1.5 rounded-md transition-colors"
+                                      title="Eliminar partido"
+                                    >
+                                      🗑️
+                                    </button>
+                                  </div>
+                                )}
 
-                        <div className="text-center pt-2">
-                          <span className="text-[10px] font-bold text-gray-500 uppercase">📍 {partido.lugar}</span>
+                                {/* MODO EDICIÓN */}
+                                {partidoEditando === partido.id ? (
+                                  <div className="flex flex-col gap-3">
+                                    <div className="flex justify-between items-center px-2 bg-gray-50 p-2 rounded-lg border border-gray-200 mb-2">
+                                      <span className="font-black text-gray-900 text-[10px] uppercase truncate text-left">{partido.local?.nombre}</span>
+                                      <span className="text-gray-400 font-black text-[10px] text-center px-2">VS</span>
+                                      <span className="font-black text-gray-900 text-[10px] uppercase text-right truncate">{partido.visitante?.nombre}</span>
+                                    </div>
+                                    <input type="date" className="border border-gray-300 rounded-md p-1.5 text-xs font-bold focus:ring-2 focus:ring-blue-500" value={datosEdicion.fecha} onChange={(e) => setDatosEdicion({...datosEdicion, fecha: e.target.value})} />
+                                    <div className="flex gap-2">
+                                      <input type="time" className="w-1/2 border border-gray-300 rounded-md p-1.5 text-xs font-bold focus:ring-2 focus:ring-blue-500" value={datosEdicion.hora} onChange={(e) => setDatosEdicion({...datosEdicion, hora: e.target.value})} />
+                                      <input type="text" placeholder="Sede" className="w-1/2 border border-gray-300 rounded-md p-1.5 text-xs font-bold focus:ring-2 focus:ring-blue-500" value={datosEdicion.lugar} onChange={(e) => setDatosEdicion({...datosEdicion, lugar: e.target.value})} />
+                                    </div>
+                                    <div className="flex gap-2 mt-2">
+                                      <button onClick={cancelarEdicion} className="w-1/2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-black text-[10px] py-2 rounded-md uppercase">Cancelar</button>
+                                      <button onClick={() => guardarEdicion(partido.id)} className="w-1/2 bg-blue-600 hover:bg-blue-700 text-white font-black text-[10px] py-2 rounded-md uppercase">Guardar</button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  /* MODO VISTA NORMAL */
+                                  <>
+                                    <div className="flex justify-between items-center border-b border-gray-200 pb-2 pr-12">
+                                      <span className="font-bold text-[10px] bg-blue-100 text-blue-800 px-2 py-0.5 rounded">{formatearHora(partido.hora)}</span>
+                                      
+                                      {partido.estado === 'suspendido' ? (
+                                        <span className="font-black text-[9px] bg-yellow-200 text-yellow-800 px-2 py-0.5 rounded uppercase">Suspendido</span>
+                                      ) : partido.estado === 'en curso' ? (
+                                        <span className="font-black text-[9px] bg-red-200 text-red-800 px-2 py-0.5 rounded uppercase animate-pulse">En Curso</span>
+                                      ) : null}
+                                    </div>
+                                    
+                                    <div className="flex justify-between items-center px-2 mt-1">
+                                      <span className="font-black text-gray-900 text-xs uppercase w-[40%] truncate text-left">{partido.local?.nombre}</span>
+                                      <span className="text-gray-400 font-black text-[10px] w-[20%] text-center">VS</span>
+                                      <span className="font-black text-gray-900 text-xs uppercase w-[40%] text-right truncate">{partido.visitante?.nombre}</span>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      </>
-                    )}
+                      ))}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -484,26 +507,46 @@ export default function PanelEmparejamientos() {
                 </h2>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 opacity-75">
-                {jugados.map((partido: any) => (
-                  <div key={partido.id} className="bg-gray-100 border border-gray-300 rounded-xl p-4 flex flex-col gap-3">
-                    <div className="flex justify-between items-center border-b border-gray-300 pb-2">
-                      <span className="font-bold text-[10px] text-gray-500 uppercase tracking-widest">{partido.fecha}</span>
-                      <span className="font-black text-[9px] bg-green-200 text-green-900 px-2 py-0.5 rounded uppercase">Finalizado</span>
-                    </div>
+              <div className="flex flex-col gap-8 opacity-80">
+                {Object.entries(jugadosAgrupados).map(([fecha, sedes]: [string, any]) => (
+                  <div key={fecha} className="flex flex-col gap-4 border-b border-gray-200 pb-6 last:border-0">
+                    <h3 className="text-lg font-black text-gray-900 uppercase flex items-center gap-2">
+                      📅 <span>{formatearFecha(fecha)}</span>
+                    </h3>
                     
-                    <div className="flex justify-between items-center px-2">
-                      <div className="flex flex-col items-center w-[40%]">
-                        <span className="font-black text-gray-900 text-xs uppercase truncate w-full text-center">{partido.local?.nombre}</span>
-                        <span className="text-xl font-black text-gray-900 mt-1">{partido.puntos_local}</span>
-                      </div>
-                      
-                      <span className="text-gray-400 font-black text-[10px] w-[20%] text-center">-</span>
-                      
-                      <div className="flex flex-col items-center w-[40%]">
-                        <span className="font-black text-gray-900 text-xs uppercase truncate w-full text-center">{partido.visitante?.nombre}</span>
-                        <span className="text-xl font-black text-gray-900 mt-1">{partido.puntos_visitante}</span>
-                      </div>
+                    <div className="flex flex-col gap-6 pl-2 md:pl-4">
+                      {Object.entries(sedes).map(([sede, partidosSede]: [string, any]) => (
+                        <div key={sede}>
+                          <h4 className="font-bold text-gray-700 uppercase mb-3 flex items-center gap-2 text-sm">
+                            📍 Sede: <span className="text-blue-600">{sede}</span>
+                          </h4>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {partidosSede.map((partido: any) => (
+                              <div key={partido.id} className="bg-gray-100 border border-gray-300 rounded-xl p-4 flex flex-col gap-3">
+                                <div className="flex justify-between items-center border-b border-gray-300 pb-2">
+                                  <span className="font-bold text-[10px] text-gray-500 uppercase tracking-widest">{formatearHora(partido.hora)}</span>
+                                  <span className="font-black text-[9px] bg-green-200 text-green-900 px-2 py-0.5 rounded uppercase">Finalizado</span>
+                                </div>
+                                
+                                <div className="flex justify-between items-center px-2">
+                                  <div className="flex flex-col items-center w-[40%]">
+                                    <span className="font-black text-gray-900 text-xs uppercase truncate w-full text-center">{partido.local?.nombre}</span>
+                                    <span className="text-xl font-black text-gray-900 mt-1">{partido.puntos_local}</span>
+                                  </div>
+                                  
+                                  <span className="text-gray-400 font-black text-[10px] w-[20%] text-center">-</span>
+                                  
+                                  <div className="flex flex-col items-center w-[40%]">
+                                    <span className="font-black text-gray-900 text-xs uppercase truncate w-full text-center">{partido.visitante?.nombre}</span>
+                                    <span className="text-xl font-black text-gray-900 mt-1">{partido.puntos_visitante}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ))}
