@@ -11,8 +11,12 @@ export default function PanelEmparejamientos() {
   const [partidosTotales, setPartidosTotales] = useState<any[]>([]);
   const [cargando, setCargando] = useState(true);
 
-  // Estado temporal para guardar lo que escribes en cada emparejamiento
+  // Estados para agendar nuevos partidos
   const [borradores, setDrafts] = useState<any>({});
+
+  // 🔥 NUEVOS ESTADOS PARA REPROGRAMAR/EDITAR PARTIDOS EXISTENTES
+  const [partidoEditando, setPartidoEditando] = useState<string | null>(null);
+  const [datosEdicion, setDatosEdicion] = useState<{fecha: string, hora: string, lugar: string}>({fecha: '', hora: '', lugar: ''});
 
   const cargarDatos = async () => {
     setCargando(true);
@@ -21,7 +25,7 @@ export default function PanelEmparejamientos() {
     const { data: eqs } = await supabase.from('equipos').select('*').order('nombre');
     if (eqs) setEquipos(eqs);
 
-    // 2. Traemos TODOS los partidos (sin filtro estricto de fase para que no haya juegos fantasma)
+    // 2. Traemos TODOS los partidos
     const { data: pts } = await supabase
       .from('partidos')
       .select('*, local:equipos!equipo_local_id(nombre, logo_url), visitante:equipos!equipo_visitante_id(nombre, logo_url)');
@@ -71,9 +75,9 @@ export default function PanelEmparejamientos() {
     }
   }
 
-  // D. Cálculo de "Pendientes": Emparejamientos Ideales MENOS los que ya existen en BD
+  // D. Cálculo de "Pendientes"
   const pendientes: any[] = [];
-  const partidosParaDescontar = [...partidosCategoria]; // Copia para no descontar el mismo partido 2 veces
+  const partidosParaDescontar = [...partidosCategoria];
 
   emparejamientosIdeales.forEach(emp => {
     let indexExistente = -1;
@@ -90,15 +94,13 @@ export default function PanelEmparejamientos() {
     }
 
     if (indexExistente !== -1) {
-      // El partido ya existe, lo sacamos de la lista para el cruce de pendientes
       partidosParaDescontar.splice(indexExistente, 1);
     } else {
-      // Si no se encontró en la base de datos, lo ponemos como pendiente
       pendientes.push(emp);
     }
   });
 
-  // 🏀 FUNCIONES DE ACCIÓN
+  // 🏀 FUNCIONES DE ACCIÓN: NUEVOS PARTIDOS
 
   const actualizarBorrador = (id: string, campo: string, valor: string) => {
     setDrafts((prev: any) => ({
@@ -145,7 +147,47 @@ export default function PanelEmparejamientos() {
         delete nuevos[emparejamiento.id];
         return nuevos;
       });
-      cargarDatos(); // Recarga la info para actualizar los contadores
+      cargarDatos();
+    }
+  };
+
+  // 🏀 FUNCIONES DE ACCIÓN: EDITAR PARTIDOS EXISTENTES
+
+  const iniciarEdicion = (partido: any) => {
+    setPartidoEditando(partido.id);
+    setDatosEdicion({
+      fecha: partido.fecha || '',
+      hora: partido.hora || '',
+      lugar: partido.lugar || ''
+    });
+  };
+
+  const cancelarEdicion = () => {
+    setPartidoEditando(null);
+    setDatosEdicion({fecha: '', hora: '', lugar: ''});
+  };
+
+  const guardarEdicion = async (id: string) => {
+    if (!datosEdicion.fecha || !datosEdicion.hora || !datosEdicion.lugar) {
+      alert("⚠️ Debes completar la fecha, la hora y la sede.");
+      return;
+    }
+
+    const { error } = await supabase
+      .from('partidos')
+      .update({
+        fecha: datosEdicion.fecha,
+        hora: datosEdicion.hora,
+        lugar: datosEdicion.lugar
+      })
+      .eq('id', id);
+
+    if (error) {
+      alert(`❌ Error al reprogramar el partido: ${error.message}`);
+    } else {
+      alert("✅ Partido actualizado y reprogramado correctamente.");
+      setPartidoEditando(null);
+      cargarDatos(); // Refresca la información del calendario
     }
   };
 
@@ -285,28 +327,85 @@ export default function PanelEmparejamientos() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 opacity-90">
                 {programados.map((partido: any) => (
-                  <div key={partido.id} className="bg-gray-50 border border-gray-200 rounded-xl p-4 flex flex-col gap-3 shadow-sm">
-                    <div className="flex justify-between items-center border-b border-gray-200 pb-2">
-                      <span className="font-bold text-[10px] text-gray-500 uppercase tracking-widest">{partido.fecha}</span>
-                      
-                      {partido.estado === 'suspendido' ? (
-                        <span className="font-black text-[9px] bg-yellow-200 text-yellow-800 px-2 py-0.5 rounded uppercase">Suspendido</span>
-                      ) : partido.estado === 'en curso' ? (
-                        <span className="font-black text-[9px] bg-red-200 text-red-800 px-2 py-0.5 rounded uppercase animate-pulse">En Curso</span>
-                      ) : (
-                        <span className="font-bold text-[10px] bg-blue-100 text-blue-800 px-2 py-0.5 rounded">{partido.hora}</span>
-                      )}
-                    </div>
+                  <div key={partido.id} className="bg-white border-2 border-gray-200 rounded-xl p-4 flex flex-col gap-3 shadow-sm hover:shadow-md transition-shadow relative">
                     
-                    <div className="flex justify-between items-center px-2">
-                      <span className="font-black text-gray-900 text-xs uppercase w-[40%] truncate text-left">{partido.local?.nombre}</span>
-                      <span className="text-gray-400 font-black text-[10px] w-[20%] text-center">VS</span>
-                      <span className="font-black text-gray-900 text-xs uppercase w-[40%] text-right truncate">{partido.visitante?.nombre}</span>
-                    </div>
+                    {/* Botón de Editar si está suspendido o programado */}
+                    {(partido.estado === 'programado' || partido.estado === 'suspendido') && partidoEditando !== partido.id && (
+                      <button 
+                        onClick={() => iniciarEdicion(partido)}
+                        className="absolute top-2 right-2 text-gray-400 hover:text-blue-600 bg-gray-50 hover:bg-blue-50 p-1.5 rounded-md transition-colors"
+                        title="Modificar partido"
+                      >
+                        ✏️
+                      </button>
+                    )}
 
-                    <div className="text-center pt-2">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase">📍 {partido.lugar}</span>
-                    </div>
+                    {/* MODO EDICIÓN */}
+                    {partidoEditando === partido.id ? (
+                      <div className="flex flex-col gap-3">
+                        <div className="flex justify-between items-center px-2 bg-gray-50 p-2 rounded-lg border border-gray-200 mb-2">
+                          <span className="font-black text-gray-900 text-[10px] uppercase truncate text-left">{partido.local?.nombre}</span>
+                          <span className="text-gray-400 font-black text-[10px] text-center px-2">VS</span>
+                          <span className="font-black text-gray-900 text-[10px] uppercase text-right truncate">{partido.visitante?.nombre}</span>
+                        </div>
+                        
+                        <input 
+                          type="date" 
+                          className="border border-gray-300 rounded-md p-1.5 text-xs font-bold focus:ring-2 focus:ring-blue-500"
+                          value={datosEdicion.fecha}
+                          onChange={(e) => setDatosEdicion({...datosEdicion, fecha: e.target.value})}
+                        />
+                        <div className="flex gap-2">
+                          <input 
+                            type="time" 
+                            className="w-1/2 border border-gray-300 rounded-md p-1.5 text-xs font-bold focus:ring-2 focus:ring-blue-500"
+                            value={datosEdicion.hora}
+                            onChange={(e) => setDatosEdicion({...datosEdicion, hora: e.target.value})}
+                          />
+                          <input 
+                            type="text" 
+                            placeholder="Sede"
+                            className="w-1/2 border border-gray-300 rounded-md p-1.5 text-xs font-bold focus:ring-2 focus:ring-blue-500"
+                            value={datosEdicion.lugar}
+                            onChange={(e) => setDatosEdicion({...datosEdicion, lugar: e.target.value})}
+                          />
+                        </div>
+
+                        <div className="flex gap-2 mt-2">
+                          <button onClick={cancelarEdicion} className="w-1/2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-black text-[10px] py-2 rounded-md uppercase">
+                            Cancelar
+                          </button>
+                          <button onClick={() => guardarEdicion(partido.id)} className="w-1/2 bg-blue-600 hover:bg-blue-700 text-white font-black text-[10px] py-2 rounded-md uppercase">
+                            Guardar
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      /* MODO VISTA NORMAL */
+                      <>
+                        <div className="flex justify-between items-center border-b border-gray-200 pb-2 pr-6">
+                          <span className="font-bold text-[10px] text-gray-500 uppercase tracking-widest">{partido.fecha}</span>
+                          
+                          {partido.estado === 'suspendido' ? (
+                            <span className="font-black text-[9px] bg-yellow-200 text-yellow-800 px-2 py-0.5 rounded uppercase">Suspendido</span>
+                          ) : partido.estado === 'en curso' ? (
+                            <span className="font-black text-[9px] bg-red-200 text-red-800 px-2 py-0.5 rounded uppercase animate-pulse">En Curso</span>
+                          ) : (
+                            <span className="font-bold text-[10px] bg-blue-100 text-blue-800 px-2 py-0.5 rounded">{partido.hora}</span>
+                          )}
+                        </div>
+                        
+                        <div className="flex justify-between items-center px-2">
+                          <span className="font-black text-gray-900 text-xs uppercase w-[40%] truncate text-left">{partido.local?.nombre}</span>
+                          <span className="text-gray-400 font-black text-[10px] w-[20%] text-center">VS</span>
+                          <span className="font-black text-gray-900 text-xs uppercase w-[40%] text-right truncate">{partido.visitante?.nombre}</span>
+                        </div>
+
+                        <div className="text-center pt-2">
+                          <span className="text-[10px] font-bold text-gray-500 uppercase">📍 {partido.lugar}</span>
+                        </div>
+                      </>
+                    )}
                   </div>
                 ))}
               </div>
