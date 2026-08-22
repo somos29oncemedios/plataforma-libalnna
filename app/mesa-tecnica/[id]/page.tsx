@@ -215,7 +215,11 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
     if (partidoBloqueado) return;
     const campo = equipo === 'local' ? 'score_manual_local' : 'score_manual_visitante';
     let valorActual = partido[campo] || 0;
-    let nuevoValor = operacion === 'sumar' ? valorActual + 1 : Math.max(0, valorActual - 1);
+    
+    // 🔥 AJUSTE: Quitamos el Math.max para permitir que el offset manual sea negativo
+    // Esto es crucial para poder restar del total global cuando sea necesario
+    let nuevoValor = operacion === 'sumar' ? valorActual + 1 : valorActual - 1;
+    
     const manualLocal = equipo === 'local' ? nuevoValor : (partido?.score_manual_local || 0);
     const manualVis = equipo === 'visitante' ? nuevoValor : (partido?.score_manual_visitante || 0);
 
@@ -446,7 +450,7 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
 
   return (
     <main className="container mx-auto py-1 px-1 max-w-[1400px]">
-      {/* MARCADOR GLOBAL EN VIVO (Con Logos Agregados) */}
+      {/* MARCADOR GLOBAL EN VIVO (Con Controles de Puntaje Directo) */}
       <div className="bg-gray-900 rounded-xl p-2 mb-1.5 shadow-xl text-white flex flex-col md:flex-row justify-between items-center gap-1.5">
         
         {/* EQUIPO LOCAL */}
@@ -462,12 +466,30 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
           <h2 className="text-xs md:text-base font-black uppercase text-center line-clamp-1">{partido?.local?.nombre}</h2>
         </div>
 
-        {/* CENTRO: MARCADOR Y SELECTOR DE CUARTOS / TIEMPO EXTRA */}
-        <div className="flex flex-col items-center justify-center bg-gray-800 px-3 py-1 rounded-xl border border-gray-700">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-lg md:text-2xl font-black text-yellow-400">{scoreLocal}</span>
-            <span className="text-sm text-gray-500">-</span>
-            <span className="text-lg md:text-2xl font-black text-yellow-400">{scoreVisitante}</span>
+        {/* CENTRO: MARCADOR GLOBAL, CONTROLES MANUALES Y SELECTOR DE CUARTOS */}
+        <div className="flex flex-col items-center justify-center bg-gray-800 px-3 py-1.5 rounded-xl border border-gray-700 shrink-0">
+          <div className="flex items-center gap-2 md:gap-4 mb-1">
+            
+            {/* Controles de Score Local */}
+            <div className="flex items-center gap-1.5">
+              <div className="flex flex-col gap-0.5">
+                <button onClick={() => ajustarScoreManual('local', 'sumar')} className="w-5 h-5 flex items-center justify-center bg-gray-700 hover:bg-gray-600 text-green-400 rounded text-[10px] font-black transition-colors" title="Sumar punto global local">+</button>
+                <button onClick={() => ajustarScoreManual('local', 'restar')} className="w-5 h-5 flex items-center justify-center bg-gray-700 hover:bg-gray-600 text-red-400 rounded text-[10px] font-black transition-colors" title="Restar punto global local">-</button>
+              </div>
+              <span className="text-xl md:text-3xl font-black text-yellow-400 w-8 md:w-12 text-center leading-none">{scoreLocal}</span>
+            </div>
+
+            <span className="text-sm md:text-base text-gray-500 font-black">-</span>
+
+            {/* Controles de Score Visitante */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-xl md:text-3xl font-black text-yellow-400 w-8 md:w-12 text-center leading-none">{scoreVisitante}</span>
+              <div className="flex flex-col gap-0.5">
+                <button onClick={() => ajustarScoreManual('visitante', 'sumar')} className="w-5 h-5 flex items-center justify-center bg-gray-700 hover:bg-gray-600 text-green-400 rounded text-[10px] font-black transition-colors" title="Sumar punto global visitante">+</button>
+                <button onClick={() => ajustarScoreManual('visitante', 'restar')} className="w-5 h-5 flex items-center justify-center bg-gray-700 hover:bg-gray-600 text-red-400 rounded text-[10px] font-black transition-colors" title="Restar punto global visitante">-</button>
+              </div>
+            </div>
+
           </div>
           
           <div className="flex items-center gap-1 bg-gray-900/80 p-0.5 rounded-lg border border-gray-700">
