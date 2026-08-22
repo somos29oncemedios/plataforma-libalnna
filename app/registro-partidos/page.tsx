@@ -13,6 +13,9 @@ export default function PanelEmparejamientos() {
 
   // Estados para agendar nuevos partidos
   const [borradores, setDrafts] = useState<any>({});
+  
+  // 🔥 NUEVO ESTADO: Memoria para saber qué emparejamientos tienen la localía invertida
+  const [equiposInvertidos, setEquiposInvertidos] = useState<{ [key: string]: boolean }>({});
 
   // Estados para REPROGRAMAR/EDITAR
   const [partidoEditando, setPartidoEditando] = useState<string | null>(null);
@@ -112,6 +115,14 @@ export default function PanelEmparejamientos() {
     }));
   };
 
+  // 🔥 NUEVA FUNCIÓN: Intercambiar equipos
+  const invertirLocalia = (id: string) => {
+    setEquiposInvertidos(prev => ({
+      ...prev,
+      [id]: !prev[id]
+    }));
+  };
+
   const agendarPartido = async (emparejamiento: any) => {
     const draft = borradores[emparejamiento.id];
     
@@ -120,12 +131,17 @@ export default function PanelEmparejamientos() {
       return;
     }
 
-    const confirmar = window.confirm(`¿Agendar ${emparejamiento.local.nombre} vs ${emparejamiento.visitante.nombre} para el ${draft.fecha}?`);
+    // Determinamos quién es finalmente local y visitante basándonos en el estado de inversión
+    const isInvertido = equiposInvertidos[emparejamiento.id];
+    const equipoLocalDefinitivo = isInvertido ? emparejamiento.visitante : emparejamiento.local;
+    const equipoVisitanteDefinitivo = isInvertido ? emparejamiento.local : emparejamiento.visitante;
+
+    const confirmar = window.confirm(`¿Agendar ${equipoLocalDefinitivo.nombre} (Local) vs ${equipoVisitanteDefinitivo.nombre} (Visita) para el ${draft.fecha}?`);
     if (!confirmar) return;
 
     const nuevoPartido = {
-      equipo_local_id: emparejamiento.local.id,
-      equipo_visitante_id: emparejamiento.visitante.id,
+      equipo_local_id: equipoLocalDefinitivo.id,
+      equipo_visitante_id: equipoVisitanteDefinitivo.id,
       categoria: categoriaActiva,
       fecha: draft.fecha,
       hora: draft.hora,
@@ -143,6 +159,12 @@ export default function PanelEmparejamientos() {
     } else {
       alert("✅ ¡Partido agendado con éxito!");
       setDrafts((prev: any) => {
+        const nuevos = { ...prev };
+        delete nuevos[emparejamiento.id];
+        return nuevos;
+      });
+      // Limpiamos también el estado de inversión para ese ID
+      setEquiposInvertidos((prev: any) => {
         const nuevos = { ...prev };
         delete nuevos[emparejamiento.id];
         return nuevos;
@@ -281,51 +303,69 @@ export default function PanelEmparejamientos() {
               </div>
             ) : (
               <div className="grid gap-4">
-                {pendientes.map((emp) => (
-                  <div key={emp.id} className="bg-white border-2 border-gray-200 rounded-xl p-4 md:p-6 flex flex-col lg:flex-row items-center gap-6 shadow-sm hover:shadow-md transition-shadow">
-                    
-                    {/* Visual del Partido */}
-                    <div className="flex items-center justify-between w-full lg:w-1/3 bg-gray-50 p-3 rounded-xl border border-gray-100">
-                      <div className="flex flex-col items-center gap-1 w-2/5">
-                        <span className="font-black text-gray-900 text-xs text-center uppercase truncate w-full">{emp.local.nombre}</span>
-                      </div>
-                      <span className="text-gray-400 font-black text-[10px] w-1/5 text-center">VS</span>
-                      <div className="flex flex-col items-center gap-1 w-2/5">
-                        <span className="font-black text-gray-900 text-xs text-center uppercase truncate w-full">{emp.visitante.nombre}</span>
-                      </div>
-                    </div>
+                {pendientes.map((emp) => {
+                  // Verificamos si este emparejamiento fue invertido por el usuario
+                  const isInvertido = equiposInvertidos[emp.id] || false;
+                  const localMostrar = isInvertido ? emp.visitante : emp.local;
+                  const visitanteMostrar = isInvertido ? emp.local : emp.visitante;
 
-                    {/* Controles de Agendamiento */}
-                    <div className="flex flex-col md:flex-row w-full lg:w-2/3 gap-3">
-                      <input 
-                        type="date" 
-                        className="flex-1 border border-gray-300 rounded-lg p-2.5 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        value={borradores[emp.id]?.fecha || ''}
-                        onChange={(e) => actualizarBorrador(emp.id, 'fecha', e.target.value)}
-                      />
-                      <input 
-                        type="time" 
-                        className="flex-1 border border-gray-300 rounded-lg p-2.5 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        value={borradores[emp.id]?.hora || ''}
-                        onChange={(e) => actualizarBorrador(emp.id, 'hora', e.target.value)}
-                      />
-                      <input 
-                        type="text" 
-                        placeholder="Cancha / Sede"
-                        className="flex-1 border border-gray-300 rounded-lg p-2.5 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        value={borradores[emp.id]?.lugar || ''}
-                        onChange={(e) => actualizarBorrador(emp.id, 'lugar', e.target.value)}
-                      />
-                      <button 
-                        onClick={() => agendarPartido(emp)}
-                        className="bg-gray-900 hover:bg-black text-white font-black px-6 py-2.5 rounded-lg uppercase tracking-wide text-xs transition-colors shadow-sm"
-                      >
-                        Agendar
-                      </button>
-                    </div>
+                  return (
+                    <div key={emp.id} className="bg-white border-2 border-gray-200 rounded-xl p-4 md:p-6 flex flex-col lg:flex-row items-center gap-6 shadow-sm hover:shadow-md transition-shadow">
+                      
+                      {/* Visual del Partido */}
+                      <div className="flex items-center justify-between w-full lg:w-1/3 bg-gray-50 p-3 rounded-xl border border-gray-100">
+                        <div className="flex flex-col items-center gap-1 w-2/5">
+                          <span className="text-[8px] text-gray-400 font-black uppercase">Local</span>
+                          <span className="font-black text-gray-900 text-xs text-center uppercase truncate w-full">{localMostrar.nombre}</span>
+                        </div>
+                        
+                        {/* 🔥 BOTÓN PARA INVERTIR LOCALÍA */}
+                        <button 
+                          onClick={() => invertirLocalia(emp.id)}
+                          className="text-gray-400 hover:text-blue-600 font-black text-lg w-1/5 text-center transition-transform hover:scale-110 active:scale-95"
+                          title="Intercambiar Local y Visitante"
+                        >
+                          🔄
+                        </button>
+                        
+                        <div className="flex flex-col items-center gap-1 w-2/5">
+                          <span className="text-[8px] text-gray-400 font-black uppercase">Visita</span>
+                          <span className="font-black text-gray-900 text-xs text-center uppercase truncate w-full">{visitanteMostrar.nombre}</span>
+                        </div>
+                      </div>
 
-                  </div>
-                ))}
+                      {/* Controles de Agendamiento */}
+                      <div className="flex flex-col md:flex-row w-full lg:w-2/3 gap-3">
+                        <input 
+                          type="date" 
+                          className="flex-1 border border-gray-300 rounded-lg p-2.5 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                          value={borradores[emp.id]?.fecha || ''}
+                          onChange={(e) => actualizarBorrador(emp.id, 'fecha', e.target.value)}
+                        />
+                        <input 
+                          type="time" 
+                          className="flex-1 border border-gray-300 rounded-lg p-2.5 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                          value={borradores[emp.id]?.hora || ''}
+                          onChange={(e) => actualizarBorrador(emp.id, 'hora', e.target.value)}
+                        />
+                        <input 
+                          type="text" 
+                          placeholder="Cancha / Sede"
+                          className="flex-1 border border-gray-300 rounded-lg p-2.5 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                          value={borradores[emp.id]?.lugar || ''}
+                          onChange={(e) => actualizarBorrador(emp.id, 'lugar', e.target.value)}
+                        />
+                        <button 
+                          onClick={() => agendarPartido(emp)}
+                          className="bg-gray-900 hover:bg-black text-white font-black px-6 py-2.5 rounded-lg uppercase tracking-wide text-xs transition-colors shadow-sm"
+                        >
+                          Agendar
+                        </button>
+                      </div>
+
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
