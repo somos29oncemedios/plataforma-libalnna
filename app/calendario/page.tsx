@@ -60,11 +60,12 @@ export default function Calendario() {
     : partidos.filter(partido => partido.categoria === categoriaActiva);
 
   // 2. Filtrar por Sección (Próximos vs Resultados)
+  // 🔥 AJUSTE: Los partidos suspendidos ahora se van a Resultados
   let partidosAMostrar = partidosPorCategoria.filter(partido => {
     if (seccionActiva === "resultados") {
-      return partido.estado === "finalizado";
+      return partido.estado === "finalizado" || partido.estado === "suspendido";
     } else {
-      return partido.estado !== "finalizado";
+      return partido.estado !== "finalizado" && partido.estado !== "suspendido";
     }
   });
 
@@ -206,6 +207,7 @@ export default function Calendario() {
                             </div>
 
                             <div className="flex flex-col items-center justify-start pt-1 md:pt-4">
+                              {/* 🔥 NUEVA LÓGICA DE RENDERIZADO PARA INCLUIR ESTADO "SUSPENDIDO" */}
                               {partido.estado === "finalizado" ? (
                                 <>
                                   <div className="flex items-center gap-1 sm:gap-2 md:gap-4">
@@ -214,6 +216,15 @@ export default function Calendario() {
                                     <span className="text-xl sm:text-3xl md:text-5xl font-black text-gray-900 tracking-tighter">{partido.puntos_visitante ?? 0}</span>
                                   </div>
                                   <span className="mt-1 md:mt-2 text-[7px] md:text-xs font-bold text-gray-400 bg-gray-50 px-1.5 py-0.5 md:px-3 md:py-1 rounded-full border border-gray-100 text-center leading-none">FINALIZADO</span>
+                                </>
+                              ) : partido.estado === "suspendido" ? (
+                                <>
+                                  <div className="flex items-center gap-1 sm:gap-2 md:gap-4">
+                                    <span className="text-xl sm:text-3xl md:text-5xl font-black text-gray-400 tracking-tighter">{partido.puntos_local ?? 0}</span>
+                                    <span className="text-gray-300 font-black text-sm md:text-2xl">-</span>
+                                    <span className="text-xl sm:text-3xl md:text-5xl font-black text-gray-400 tracking-tighter">{partido.puntos_visitante ?? 0}</span>
+                                  </div>
+                                  <span className="mt-1 md:mt-2 text-[7px] md:text-xs font-bold text-yellow-800 bg-yellow-100 px-1.5 py-0.5 md:px-3 md:py-1 rounded-full border border-yellow-300 text-center leading-none shadow-sm">SUSPENDIDO</span>
                                 </>
                               ) : partido.estado === "en curso" ? (
                                 <>

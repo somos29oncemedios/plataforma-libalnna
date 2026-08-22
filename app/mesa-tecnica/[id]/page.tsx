@@ -11,7 +11,7 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
   const [cargando, setCargando] = useState(true);
   const [editandoDespuesDeFinalizar, setEditandoDespuesDeFinalizar] = useState(false);
 
-  // 🏀 ROSTERS COMPLETOS DEL PARTIDO (Filtrados por categoría)
+  // 🏀 ROSTERS COMPLETOS DEL PARTIDO
   const [rosterLocalCompleto, setRosterLocalCompleto] = useState<any[]>([]);
   const [rosterVisitanteCompleto, setRosterVisitanteCompleto] = useState<any[]>([]);
 
@@ -29,7 +29,7 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
   // 🏀 ESTADO PARA MODAL DE BANCA
   const [modalBanca, setModalBanca] = useState<'local' | 'visitante' | null>(null);
 
-  // 🏀 ESTADOS PARA LA MEMORIA MUSCULAR (Acción y Operación: sumar o restar)
+  // 🏀 ESTADOS PARA LA MEMORIA MUSCULAR (Acción y Operación)
   const [accionPendiente, setAccionPendiente] = useState<'tl' | 'd2' | 't3' | null>(null);
   const [modoOperacion, setModoOperacion] = useState<'sumar' | 'restar'>('sumar');
 
@@ -43,7 +43,6 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
     if (partidoData) {
       setPartido(partidoData);
 
-      // Traemos a TODOS los jugadores de ambos equipos primero
       const { data: jugadoresData } = await supabase
         .from('jugadores')
         .select('*')
@@ -51,10 +50,8 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
         .order('numero', { ascending: true });
 
       if (jugadoresData) {
-        // Filtramos verificando el arreglo de categorías del jugador
         const jugadoresFiltrados = jugadoresData.filter((j: any) => {
           if (!partidoData.categoria) return true; 
-          
           if (Array.isArray(j.categorias)) {
             return j.categorias.includes(partidoData.categoria);
           }
@@ -66,6 +63,21 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
 
         setRosterLocalCompleto(localTeam);
         setRosterVisitanteCompleto(visitorTeam);
+
+        // 🔥 JUGADA CLAVE: Recuperar alineación de la Memoria Local (localStorage)
+        const estadoGuardado = localStorage.getItem(`libalnna_partido_${id}`);
+        if (estadoGuardado && (partidoData.estado === 'en curso' || partidoData.estado === 'suspendido')) {
+          try {
+            const memoria = JSON.parse(estadoGuardado);
+            setCanchaLocal(memoria.canchaLocal || []);
+            setBancaLocal(memoria.bancaLocal || []);
+            setCanchaVisitante(memoria.canchaVisitante || []);
+            setBancaVisitante(memoria.bancaVisitante || []);
+            setSeleccionInicial(false); // Saltamos la fase 0 porque ya estaba configurado
+          } catch (e) {
+            console.error("Error leyendo la memoria local:", e);
+          }
+        }
       }
 
       const { data: statsData } = await supabase
@@ -106,52 +118,106 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
   };
 
   const confirmarQuintetos = async () => {
-    setCanchaLocal(selLocal);
-    setBancaLocal(rosterLocalCompleto.filter(j => !selLocal.find(s => s.id === j.id)));
-    
-    setCanchaVisitante(selVisitante);
-    setBancaVisitante(rosterVisitanteCompleto.filter(j => !selVisitante.find(s => s.id === j.id)));
-    
+    const cL = selLocal;
+    const bL = rosterLocalCompleto.filter(j => !selLocal.find(s => s.id === j.id));
+    const cV = selVisitante;
+    const bV = rosterVisitanteCompleto.filter(j => !selVisitante.find(s => s.id === j.id));
+
+    setCanchaLocal(cL);
+    setBancaLocal(bL);
+    setCanchaVisitante(cV);
+    setBancaVisitante(bV);
     setSeleccionInicial(false);
 
-    // Si el partido estaba programado, lo pasamos a "en curso" automáticamente
+    // 🔥 GUARDAR ALINEACIÓN EN MEMORIA LOCAL
+    localStorage.setItem(`libalnna_partido_${id}`, JSON.stringify({
+      canchaLocal: cL,
+      bancaLocal: bL,
+      canchaVisitante: cV,
+      bancaVisitante: bV
+    }));
+
     if (partido?.estado === 'programado') {
       await supabase.from('partidos').update({ estado: 'en curso' }).eq('id', id);
       setPartido({ ...partido, estado: 'en curso' });
     }
   };
 
-  // 🏀 NUEVA FUNCIÓN: REVERTIR ESTADO A "PROGRAMADO"
+  // 🏀 FUNCIONES DE CAMBIO DE ESTATUS DEL PARTIDO
   const revertirAProgramado = async () => {
-    const confirmar = window.confirm("⚠️ ¿Estás seguro de que deseas devolver este partido a 'Programado'? Esto quitará el partido de la vista 'En Vivo' del público.");
+    const confirmar = window.confirm("⚠️ ¿Deseas devolver este partido a 'Programado'? Esto quitará el partido de la vista 'En Vivo'.");
     if (!confirmar) return;
 
     const { error } = await supabase.from('partidos').update({ estado: 'programado' }).eq('id', id);
     if (!error) {
-      alert('✅ Partido devuelto a estado Programado correctamente.');
+      localStorage.removeItem(`libalnna_partido_${id}`); // Borramos memoria local
+      alert('✅ Partido devuelto a estado Programado.');
       setPartido({ ...partido, estado: 'programado' });
+      setSeleccionInicial(true); // Devolvemos a la pantalla de selección
     } else {
       alert(`❌ Error técnico: ${error.message}`);
     }
   };
 
-  // ----- LÓGICA DE JUEGO PRINCIPAL -----
+  const suspenderPartido = async () => {
+    const confirmar = window.confirm("⏸️ ¿Estás seguro de SUSPENDER este partido?");
+    if (!confirmar) return;
 
-  const partidoBloqueado = partido?.estado === 'finalizado' && !editandoDespuesDeFinalizar;
+    await sincronizarPuntosGlobales(estadisticas, partido?.score_manual_local || 0, partido?.score_manual_visitante || 0);
+    const { error } = await supabase.from('partidos').update({ estado: 'suspendido' }).eq('id', id);
+    
+    if (!error) {
+      alert('⏸️ Partido marcado como suspendido.');
+      setPartido({ ...partido, estado: 'suspendido' });
+    } else {
+      alert(`❌ Error técnico: ${error.message}`);
+    }
+  };
+
+  const reanudarPartido = async () => {
+    const confirmar = window.confirm("▶️ ¿Deseas reanudar este partido?");
+    if (!confirmar) return;
+
+    // Si estaban en fase 0 y lo reanudan, lo dejamos en programado para que sigan armando la alineación
+    const nuevoEstado = seleccionInicial ? 'programado' : 'en curso';
+
+    const { error } = await supabase.from('partidos').update({ estado: nuevoEstado }).eq('id', id);
+    if (!error) {
+      alert('✅ Partido reanudado.');
+      setPartido({ ...partido, estado: nuevoEstado });
+    } else {
+      alert(`❌ Error técnico: ${error.message}`);
+    }
+  };
+
+  const finalizarPartido = async () => {
+    const confirmar = window.confirm("🛑 ¿Estás seguro de guardar el marcador definitivo y cerrar el panel?");
+    if (!confirmar) return;
+    
+    await sincronizarPuntosGlobales(estadisticas, partido?.score_manual_local || 0, partido?.score_manual_visitante || 0);
+    const { error } = await supabase.from('partidos').update({ estado: 'finalizado' }).eq('id', id);
+    
+    if (!error) {
+      localStorage.removeItem(`libalnna_partido_${id}`); // Limpiamos la memoria local al terminar
+      alert('✅ ¡Partido finalizado y marcador guardado!');
+      setPartido({ ...partido, estado: 'finalizado' });
+      setEditandoDespuesDeFinalizar(false);
+    }
+  };
+
+
+  // ----- LÓGICA DE JUEGO PRINCIPAL -----
+  const partidoBloqueado = (partido?.estado === 'finalizado' || partido?.estado === 'suspendido') && !editandoDespuesDeFinalizar;
 
   const anotarEstadistica = async (jugadorId: string, equipoId: string, tipo: 'tl' | 'd2' | 't3', operacion: 'sumar' | 'restar') => {
     if (partidoBloqueado) {
-      alert('El partido ya ha finalizado. Habilita la edición si necesitas hacer correcciones.');
+      alert(partido?.estado === 'suspendido' ? '⏸️ El partido está suspendido. Reanúdalo para seguir anotando.' : '🛑 El partido ya ha finalizado.');
       return;
     }
 
     const statsActuales = estadisticas[jugadorId] || {
-      partido_id: id,
-      jugador_id: jugadorId,
-      equipo_id: equipoId,
-      puntos_totales: 0,
-      tiros_libres_anotados: 0,
-      triples_anotados: 0
+      partido_id: id, jugador_id: jugadorId, equipo_id: equipoId,
+      puntos_totales: 0, tiros_libres_anotados: 0, triples_anotados: 0
     };
 
     let nuevosPuntos = statsActuales.puntos_totales || 0;
@@ -169,11 +235,7 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
       else { nuevosPuntos = Math.max(0, nuevosPuntos - 3); nuevosTriples = Math.max(0, nuevosTriples - 1); }
     }
 
-    const datosActualizados = {
-      puntos_totales: nuevosPuntos,
-      tiros_libres_anotados: nuevosTL,
-      triples_anotados: nuevosTriples
-    };
+    const datosActualizados = { puntos_totales: nuevosPuntos, tiros_libres_anotados: nuevosTL, triples_anotados: nuevosTriples };
 
     let error = null;
     let registroExistente = estadisticas[jugadorId];
@@ -216,8 +278,6 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
     const campo = equipo === 'local' ? 'score_manual_local' : 'score_manual_visitante';
     let valorActual = partido[campo] || 0;
     
-    // 🔥 AJUSTE: Quitamos el Math.max para permitir que el offset manual sea negativo
-    // Esto es crucial para poder restar del total global cuando sea necesario
     let nuevoValor = operacion === 'sumar' ? valorActual + 1 : valorActual - 1;
     
     const manualLocal = equipo === 'local' ? nuevoValor : (partido?.score_manual_local || 0);
@@ -255,44 +315,39 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
     }
   };
 
-  const finalizarPartido = async () => {
-    const confirmar = window.confirm("🛑 ¿Estás seguro de guardar el marcador definitivo y cerrar el panel del partido?");
-    if (!confirmar) return;
-    await sincronizarPuntosGlobales(estadisticas, partido?.score_manual_local || 0, partido?.score_manual_visitante || 0);
-    const { error } = await supabase.from('partidos').update({ estado: 'finalizado' }).eq('id', id);
-    if (!error) {
-      alert('✅ ¡Partido finalizado y marcador guardado con éxito!');
-      setPartido({ ...partido, estado: 'finalizado' });
-      setEditandoDespuesDeFinalizar(false);
-    }
-  };
-
   const sustituirJugador = (jugador: any, equipo: 'local' | 'visitante', accion: 'entrar' | 'salir') => {
+    let cL = [...canchaLocal]; let bL = [...bancaLocal];
+    let cV = [...canchaVisitante]; let bV = [...bancaVisitante];
+
     if (equipo === 'local') {
       if (accion === 'entrar') {
-        if (canchaLocal.length >= 5) {
-          alert("¡Falta técnica! Ya hay 5 jugadores en la cancha. Saca a uno primero.");
-          return;
-        }
-        setBancaLocal(bancaLocal.filter(j => j.id !== jugador.id));
-        setCanchaLocal([...canchaLocal, jugador]);
+        if (cL.length >= 5) { alert("¡Falta técnica! Saca a un jugador primero."); return; }
+        bL = bL.filter(j => j.id !== jugador.id);
+        cL.push(jugador);
       } else {
-        setCanchaLocal(canchaLocal.filter(j => j.id !== jugador.id));
-        setBancaLocal([...bancaLocal, jugador].sort((a, b) => a.numero - b.numero));
+        cL = cL.filter(j => j.id !== jugador.id);
+        bL.push(jugador);
+        bL.sort((a, b) => a.numero - b.numero);
       }
+      setCanchaLocal(cL); setBancaLocal(bL);
     } else {
       if (accion === 'entrar') {
-        if (canchaVisitante.length >= 5) {
-          alert("¡Falta técnica! Ya hay 5 jugadores en la cancha. Saca a uno primero.");
-          return;
-        }
-        setBancaVisitante(bancaVisitante.filter(j => j.id !== jugador.id));
-        setCanchaVisitante([...canchaVisitante, jugador]);
+        if (cV.length >= 5) { alert("¡Falta técnica! Saca a un jugador primero."); return; }
+        bV = bV.filter(j => j.id !== jugador.id);
+        cV.push(jugador);
       } else {
-        setCanchaVisitante(canchaVisitante.filter(j => j.id !== jugador.id));
-        setBancaVisitante([...bancaVisitante, jugador].sort((a, b) => a.numero - b.numero));
+        cV = cV.filter(j => j.id !== jugador.id);
+        bV.push(jugador);
+        bV.sort((a, b) => a.numero - b.numero);
       }
+      setCanchaVisitante(cV); setBancaVisitante(bV);
     }
+
+    // 🔥 ACTUALIZAR LA MEMORIA LOCAL CON LA NUEVA ALINEACIÓN
+    localStorage.setItem(`libalnna_partido_${id}`, JSON.stringify({
+      canchaLocal: cL, bancaLocal: bL,
+      canchaVisitante: cV, bancaVisitante: bV
+    }));
   };
 
   const clickCamisetaJugador = (jugador: any, equipoId: string) => {
@@ -320,8 +375,16 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
     const isVisitaReady = selVisitante.length === Math.min(5, rosterVisitanteCompleto.length);
 
     return (
-      <main className="container mx-auto py-8 px-4 max-w-5xl">
-        <div className="bg-white rounded-3xl p-6 md:p-10 shadow-2xl border-2 border-gray-100">
+      <main className="container mx-auto py-8 px-4 max-w-5xl relative">
+        <div className="bg-white rounded-3xl p-6 md:p-10 shadow-2xl border-2 border-gray-100 relative mt-4">
+          
+          {/* BANNER DE SUSPENDIDO EN FASE 0 */}
+          {partido?.estado === 'suspendido' && (
+            <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-yellow-500 text-gray-900 px-6 py-1.5 rounded-full font-black text-xs uppercase tracking-widest shadow-md z-10 animate-pulse border-2 border-yellow-600">
+              PARTIDO SUSPENDIDO
+            </div>
+          )}
+
           <div className="text-center mb-8">
             <span className="bg-blue-100 text-blue-800 text-xs font-black px-3 py-1 rounded-full tracking-widest uppercase">Paso Previo</span>
             <h1 className="text-2xl md:text-4xl font-black text-gray-900 uppercase tracking-tight mt-3">
@@ -392,23 +455,42 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
           </div>
 
           <div className="mt-8 flex flex-col items-center gap-4">
+            
             <button
               disabled={(!isLocalReady && rosterLocalCompleto.length >= 5) || (!isVisitaReady && rosterVisitanteCompleto.length >= 5)}
               onClick={confirmarQuintetos}
-              className="bg-gray-900 hover:bg-black text-white px-8 py-4 rounded-xl font-black uppercase tracking-widest shadow-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              className="bg-gray-900 hover:bg-black text-white px-8 py-4 rounded-xl font-black uppercase tracking-widest shadow-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all w-full md:w-auto"
             >
               Confirmar e Ir a la Cancha 🏀
             </button>
 
+            {/* 🔥 BOTONES DE SUSPENSIÓN Y REANUDACIÓN EN FASE 0 */}
+            {partido?.estado === 'suspendido' ? (
+              <button 
+                onClick={reanudarPartido} 
+                className="bg-green-600 hover:bg-green-700 text-white font-black px-6 py-2 rounded-xl shadow-md transition-all uppercase tracking-widest text-xs border-b-4 border-green-800 active:border-b-0 w-full md:w-auto"
+              >
+                ▶️ Reanudar Partido
+              </button>
+            ) : (
+              <button 
+                onClick={suspenderPartido} 
+                className="bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-black px-6 py-2 rounded-xl shadow-md transition-all uppercase tracking-widest text-xs border-b-4 border-yellow-700 active:border-b-0 w-full md:w-auto"
+              >
+                ⏸️ Suspender Partido
+              </button>
+            )}
+
             {/* BOTÓN PARA REVERTIR PARTIDO EN CURSO DESDE LA FASE 0 */}
-            {partido?.estado === 'en curso' && (
+            {(partido?.estado === 'en curso' || partido?.estado === 'suspendido') && (
               <button 
                 onClick={revertirAProgramado} 
-                className="text-red-500 hover:text-red-700 text-xs font-bold underline transition-colors"
+                className="text-red-500 hover:text-red-700 text-xs font-bold underline transition-colors mt-2"
               >
                 ⏪ Cancelar y devolver partido a "Programado"
               </button>
             )}
+
           </div>
         </div>
       </main>
@@ -450,40 +532,38 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
 
   return (
     <main className="container mx-auto py-1 px-1 max-w-[1400px]">
-      {/* MARCADOR GLOBAL EN VIVO (Con Controles de Puntaje Directo) */}
-      <div className="bg-gray-900 rounded-xl p-2 mb-1.5 shadow-xl text-white flex flex-col md:flex-row justify-between items-center gap-1.5">
+      {/* MARCADOR GLOBAL EN VIVO */}
+      <div className="bg-gray-900 rounded-xl p-2 mb-1.5 shadow-xl text-white flex flex-col md:flex-row justify-between items-center gap-1.5 relative">
         
-        {/* EQUIPO LOCAL */}
-        <div className="flex flex-col items-center md:w-1/3">
+        {partido?.estado === 'suspendido' && (
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-yellow-500 text-gray-900 px-4 py-0.5 rounded-full font-black text-[10px] uppercase tracking-widest shadow-md z-10 animate-pulse">
+            PARTIDO SUSPENDIDO
+          </div>
+        )}
+
+        <div className="flex flex-col items-center md:w-1/3 mt-2 md:mt-0">
           <span className="text-[8px] font-bold text-blue-400 tracking-wider mb-1">LOCAL</span>
           <div className="w-8 h-8 md:w-10 md:h-10 bg-white rounded-full flex items-center justify-center shrink-0 mb-1 overflow-hidden border border-gray-600 shadow-sm">
-            {partido?.local?.logo_url ? (
-              <img src={partido.local.logo_url} alt={partido.local.nombre} className="w-full h-full object-contain p-0.5" />
-            ) : (
-              <span className="text-gray-900 font-black text-xs">{partido?.local?.nombre?.charAt(0) || 'L'}</span>
-            )}
+            {partido?.local?.logo_url ? <img src={partido.local.logo_url} alt={partido.local.nombre} className="w-full h-full object-contain p-0.5" /> : <span className="text-gray-900 font-black text-xs">{partido?.local?.nombre?.charAt(0) || 'L'}</span>}
           </div>
           <h2 className="text-xs md:text-base font-black uppercase text-center line-clamp-1">{partido?.local?.nombre}</h2>
         </div>
 
-        {/* CENTRO: MARCADOR GLOBAL, CONTROLES MANUALES Y SELECTOR DE CUARTOS */}
-        <div className="flex flex-col items-center justify-center bg-gray-800 px-3 py-1.5 rounded-xl border border-gray-700 shrink-0">
+        <div className={`flex flex-col items-center justify-center px-3 py-1.5 rounded-xl border shrink-0 transition-colors ${partido?.estado === 'suspendido' ? 'bg-yellow-900/40 border-yellow-700/50' : 'bg-gray-800 border-gray-700'}`}>
           <div className="flex items-center gap-2 md:gap-4 mb-1">
             
-            {/* Controles de Score Local */}
             <div className="flex items-center gap-1.5">
               <div className="flex flex-col gap-0.5">
                 <button onClick={() => ajustarScoreManual('local', 'sumar')} className="w-5 h-5 flex items-center justify-center bg-gray-700 hover:bg-gray-600 text-green-400 rounded text-[10px] font-black transition-colors" title="Sumar punto global local">+</button>
                 <button onClick={() => ajustarScoreManual('local', 'restar')} className="w-5 h-5 flex items-center justify-center bg-gray-700 hover:bg-gray-600 text-red-400 rounded text-[10px] font-black transition-colors" title="Restar punto global local">-</button>
               </div>
-              <span className="text-xl md:text-3xl font-black text-yellow-400 w-8 md:w-12 text-center leading-none">{scoreLocal}</span>
+              <span className={`text-xl md:text-3xl font-black w-8 md:w-12 text-center leading-none ${partido?.estado === 'suspendido' ? 'text-yellow-600' : 'text-yellow-400'}`}>{scoreLocal}</span>
             </div>
 
             <span className="text-sm md:text-base text-gray-500 font-black">-</span>
 
-            {/* Controles de Score Visitante */}
             <div className="flex items-center gap-1.5">
-              <span className="text-xl md:text-3xl font-black text-yellow-400 w-8 md:w-12 text-center leading-none">{scoreVisitante}</span>
+              <span className={`text-xl md:text-3xl font-black w-8 md:w-12 text-center leading-none ${partido?.estado === 'suspendido' ? 'text-yellow-600' : 'text-yellow-400'}`}>{scoreVisitante}</span>
               <div className="flex flex-col gap-0.5">
                 <button onClick={() => ajustarScoreManual('visitante', 'sumar')} className="w-5 h-5 flex items-center justify-center bg-gray-700 hover:bg-gray-600 text-green-400 rounded text-[10px] font-black transition-colors" title="Sumar punto global visitante">+</button>
                 <button onClick={() => ajustarScoreManual('visitante', 'restar')} className="w-5 h-5 flex items-center justify-center bg-gray-700 hover:bg-gray-600 text-red-400 rounded text-[10px] font-black transition-colors" title="Restar punto global visitante">-</button>
@@ -509,135 +589,77 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
           </div>
         </div>
 
-        {/* EQUIPO VISITANTE */}
         <div className="flex flex-col items-center md:w-1/3">
           <span className="text-[8px] font-bold text-red-400 tracking-wider mb-1">VISITANTE</span>
           <div className="w-8 h-8 md:w-10 md:h-10 bg-white rounded-full flex items-center justify-center shrink-0 mb-1 overflow-hidden border border-gray-600 shadow-sm">
-            {partido?.visitante?.logo_url ? (
-              <img src={partido.visitante.logo_url} alt={partido.visitante.nombre} className="w-full h-full object-contain p-0.5" />
-            ) : (
-              <span className="text-gray-900 font-black text-xs">{partido?.visitante?.nombre?.charAt(0) || 'V'}</span>
-            )}
+            {partido?.visitante?.logo_url ? <img src={partido.visitante.logo_url} alt={partido.visitante.nombre} className="w-full h-full object-contain p-0.5" /> : <span className="text-gray-900 font-black text-xs">{partido?.visitante?.nombre?.charAt(0) || 'V'}</span>}
           </div>
           <h2 className="text-xs md:text-base font-black uppercase text-center line-clamp-1">{partido?.visitante?.nombre}</h2>
         </div>
 
       </div>
 
-      {/* SELECTOR DE MODO (SUMAR VS RESTAR) */}
       <div className="bg-white rounded-xl p-1 mb-1.5 shadow-sm border border-gray-200 flex justify-center items-center gap-3">
         <span className="text-[10px] font-black text-gray-700 uppercase">Modo:</span>
         <div className="flex bg-gray-100 p-0.5 rounded-lg">
-          <button 
-            onClick={() => setModoOperacion('sumar')} 
-            className={`px-2.5 py-0.5 rounded-md text-[11px] font-black transition-all ${modoOperacion === 'sumar' ? 'bg-green-600 text-white shadow' : 'text-gray-600 hover:bg-gray-200'}`}
-          >
-            ➕ Sumar
-          </button>
-          <button 
-            onClick={() => setModoOperacion('restar')} 
-            className={`px-2.5 py-0.5 rounded-md text-[11px] font-black transition-all ${modoOperacion === 'restar' ? 'bg-red-600 text-white shadow' : 'text-gray-600 hover:bg-gray-200'}`}
-          >
-            ➖ Restar / Corregir
-          </button>
+          <button onClick={() => setModoOperacion('sumar')} className={`px-2.5 py-0.5 rounded-md text-[11px] font-black transition-all ${modoOperacion === 'sumar' ? 'bg-green-600 text-white shadow' : 'text-gray-600 hover:bg-gray-200'}`}>➕ Sumar</button>
+          <button onClick={() => setModoOperacion('restar')} className={`px-2.5 py-0.5 rounded-md text-[11px] font-black transition-all ${modoOperacion === 'restar' ? 'bg-red-600 text-white shadow' : 'text-gray-600 hover:bg-gray-200'}`}>➖ Restar / Corregir</button>
         </div>
       </div>
 
-      {/* LAYOUT DE 3 COLUMNAS: LATERALES 22%, CANCHA 56% PARA ACOMODAR LAS TARJETAS 2,2,1 */}
       <div className="flex flex-col lg:flex-row gap-1.5 mb-1.5 items-stretch lg:justify-center">
         
-        {/* COLUMNA IZQUIERDA: EQUIPO LOCAL EN CANCHA */}
         <div className="w-full lg:w-[22%] lg:min-w-[180px] bg-blue-50/50 rounded-xl p-1.5 lg:p-2 border-2 border-blue-100 shadow-inner order-2 lg:order-1 flex flex-col justify-start">
           <div className="w-full flex justify-between items-center mb-0.5 border-b border-blue-200 pb-0.5">
-            <span className="font-black text-blue-800 text-[9px] lg:text-[11px] uppercase tracking-wide truncate max-w-[75%]">
-              {partido?.local?.nombre || 'Local'}
-            </span>
+            <span className="font-black text-blue-800 text-[9px] lg:text-[11px] uppercase tracking-wide truncate max-w-[75%]">{partido?.local?.nombre || 'Local'}</span>
             <span className="text-[7.5px] bg-blue-600 text-white px-1 py-0.2 rounded">{canchaLocal.length}/5</span>
           </div>
-          
           <div className="flex flex-row lg:flex-wrap justify-between lg:justify-center items-center gap-0.5 lg:gap-1.5 w-full flex-1 my-0.5 lg:my-2">
-            {canchaLocal.map(jugador => (
-              <JugadorCancha key={jugador.id} jugador={jugador} equipo={partido.equipo_local_id} tipoEquipo="local" />
-            ))}
+            {canchaLocal.map(jugador => (<JugadorCancha key={jugador.id} jugador={jugador} equipo={partido.equipo_local_id} tipoEquipo="local" />))}
           </div>
-
-          <button 
-            onClick={() => setModalBanca('local')}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white text-[9px] lg:text-[10px] font-black py-1 px-1.5 rounded-lg shadow transition-all uppercase tracking-wide flex items-center justify-center gap-1 mt-auto"
-          >
+          <button onClick={() => setModalBanca('local')} className="w-full bg-blue-600 hover:bg-blue-700 text-white text-[9px] lg:text-[10px] font-black py-1 px-1.5 rounded-lg shadow transition-all uppercase tracking-wide flex items-center justify-center gap-1 mt-auto">
             🔄 Banca ({bancaLocal.length})
           </button>
         </div>
 
-        {/* COLUMNA CENTRAL: CANCHA INTERACTIVA FULL COURT (MÁS ANCHA: lg:w-[56%]) */}
         <div className="w-full lg:w-[56%] flex flex-col items-center order-1 lg:order-2">
           <div className="bg-white rounded-xl p-1.5 w-full shadow-sm border-2 border-gray-200 flex flex-col items-center">
             <p className="text-[10px] md:text-xs font-black text-gray-800 uppercase mb-1 text-center">
               1. Toca la zona {modoOperacion === 'restar' ? 'para RESTAR' : 'para SUMAR'}
             </p>
             
-            {/* DIBUJO DE LA CANCHA COMPLETA */}
             <div className="relative w-full aspect-[2/1] bg-gray-800 border-2 border-white overflow-hidden mx-auto shadow-md rounded-sm">
                
-               {/* LÍNEA Y CÍRCULO CENTRAL */}
                <div className="absolute top-0 bottom-0 left-1/2 w-1 bg-white -translate-x-1/2 pointer-events-none z-20" />
                <div className="absolute top-1/2 left-1/2 w-8 h-8 md:w-14 md:h-14 border-2 border-white rounded-full -translate-x-1/2 -translate-y-1/2 pointer-events-none z-20" />
 
-               {/* MITAD IZQUIERDA */}
-               <div 
-                 className={`absolute top-0 bottom-0 left-0 w-1/2 cursor-pointer flex items-center justify-start pl-1.5 transition-colors duration-200 z-0 ${accionPendiente === 't3' ? (modoOperacion === 'sumar' ? 'bg-yellow-400' : 'bg-red-500') : 'bg-gray-800 hover:bg-gray-700'}`}
-                 onClick={() => setAccionPendiente('t3')}
-               >
+               <div className={`absolute top-0 bottom-0 left-0 w-1/2 cursor-pointer flex items-center justify-start pl-1.5 transition-colors duration-200 z-0 ${accionPendiente === 't3' ? (modoOperacion === 'sumar' ? 'bg-yellow-400' : 'bg-red-500') : 'bg-gray-800 hover:bg-gray-700'}`} onClick={() => setAccionPendiente('t3')}>
                  <span className={`font-black text-[9px] md:text-[11px] pointer-events-none -rotate-90 transition-colors ${accionPendiente === 't3' ? 'text-gray-900' : 'text-white/40'}`}>3 PTS</span>
                </div>
                
-               <div 
-                 className={`absolute top-[10%] bottom-[10%] left-0 w-[45%] border-2 border-white rounded-r-full cursor-pointer flex items-center justify-end pr-1.5 transition-colors duration-200 z-10 ${accionPendiente === 'd2' ? (modoOperacion === 'sumar' ? 'bg-yellow-400' : 'bg-red-500') : 'bg-blue-600 hover:bg-blue-500'}`}
-                 onClick={(e) => { e.stopPropagation(); setAccionPendiente('d2'); }}
-               >
+               <div className={`absolute top-[10%] bottom-[10%] left-0 w-[45%] border-2 border-white rounded-r-full cursor-pointer flex items-center justify-end pr-1.5 transition-colors duration-200 z-10 ${accionPendiente === 'd2' ? (modoOperacion === 'sumar' ? 'bg-yellow-400' : 'bg-red-500') : 'bg-blue-600 hover:bg-blue-500'}`} onClick={(e) => { e.stopPropagation(); setAccionPendiente('d2'); }}>
                  <span className={`font-black text-[8px] md:text-[11px] pointer-events-none transition-colors ${accionPendiente === 'd2' ? 'text-gray-900' : 'text-white/80'}`}>2 PTS</span>
                </div>
 
-               <div 
-                 className={`absolute top-[35%] bottom-[35%] left-0 w-[25%] border-2 border-white cursor-pointer transition-colors duration-200 z-20 ${accionPendiente === 'd2' ? (modoOperacion === 'sumar' ? 'bg-yellow-400' : 'bg-red-500') : 'bg-blue-800 hover:bg-blue-700'}`}
-                 onClick={(e) => { e.stopPropagation(); setAccionPendiente('d2'); }}
-               ></div>
+               <div className={`absolute top-[35%] bottom-[35%] left-0 w-[25%] border-2 border-white cursor-pointer transition-colors duration-200 z-20 ${accionPendiente === 'd2' ? (modoOperacion === 'sumar' ? 'bg-yellow-400' : 'bg-red-500') : 'bg-blue-800 hover:bg-blue-700'}`} onClick={(e) => { e.stopPropagation(); setAccionPendiente('d2'); }}></div>
 
-               {/* CÍRCULO TIRO LIBRE IZQUIERDO */}
-               <div 
-                 className={`absolute top-1/2 left-[25%] w-9 h-9 md:w-14 md:h-14 border-[3px] border-white rounded-full -translate-y-1/2 -translate-x-1/2 cursor-pointer flex items-center justify-center transition-colors duration-200 z-30 ${accionPendiente === 'tl' ? (modoOperacion === 'sumar' ? 'bg-yellow-400' : 'bg-red-500') : 'bg-red-600 hover:bg-red-500'}`}
-                 onClick={(e) => { e.stopPropagation(); setAccionPendiente('tl'); }}
-               >
+               <div className={`absolute top-1/2 left-[25%] w-9 h-9 md:w-14 md:h-14 border-[3px] border-white rounded-full -translate-y-1/2 -translate-x-1/2 cursor-pointer flex items-center justify-center transition-colors duration-200 z-30 ${accionPendiente === 'tl' ? (modoOperacion === 'sumar' ? 'bg-yellow-400' : 'bg-red-500') : 'bg-red-600 hover:bg-red-500'}`} onClick={(e) => { e.stopPropagation(); setAccionPendiente('tl'); }}>
                  <span className={`font-black text-[7px] md:text-[10px] pointer-events-none transition-colors ${accionPendiente === 'tl' ? 'text-gray-900' : 'text-white'}`}>1 PT</span>
                </div>
                
                <div className="absolute top-1/2 left-2 w-2 h-2 md:w-3 md:h-3 border border-orange-400 rounded-full -translate-y-1/2 pointer-events-none bg-orange-200/50 z-40" />
 
-               {/* MITAD DERECHA */}
-               <div 
-                 className={`absolute top-0 bottom-0 right-0 w-1/2 cursor-pointer flex items-center justify-end pr-1.5 transition-colors duration-200 z-0 ${accionPendiente === 't3' ? (modoOperacion === 'sumar' ? 'bg-yellow-400' : 'bg-red-500') : 'bg-gray-800 hover:bg-gray-700'}`}
-                 onClick={() => setAccionPendiente('t3')}
-               >
+               <div className={`absolute top-0 bottom-0 right-0 w-1/2 cursor-pointer flex items-center justify-end pr-1.5 transition-colors duration-200 z-0 ${accionPendiente === 't3' ? (modoOperacion === 'sumar' ? 'bg-yellow-400' : 'bg-red-500') : 'bg-gray-800 hover:bg-gray-700'}`} onClick={() => setAccionPendiente('t3')}>
                  <span className={`font-black text-[9px] md:text-[11px] pointer-events-none rotate-90 transition-colors ${accionPendiente === 't3' ? 'text-gray-900' : 'text-white/40'}`}>3 PTS</span>
                </div>
                
-               <div 
-                 className={`absolute top-[10%] bottom-[10%] right-0 w-[45%] border-2 border-white rounded-l-full cursor-pointer flex items-center justify-start pl-1.5 transition-colors duration-200 z-10 ${accionPendiente === 'd2' ? (modoOperacion === 'sumar' ? 'bg-yellow-400' : 'bg-red-500') : 'bg-blue-600 hover:bg-blue-500'}`}
-                 onClick={(e) => { e.stopPropagation(); setAccionPendiente('d2'); }}
-               >
+               <div className={`absolute top-[10%] bottom-[10%] right-0 w-[45%] border-2 border-white rounded-l-full cursor-pointer flex items-center justify-start pl-1.5 transition-colors duration-200 z-10 ${accionPendiente === 'd2' ? (modoOperacion === 'sumar' ? 'bg-yellow-400' : 'bg-red-500') : 'bg-blue-600 hover:bg-blue-500'}`} onClick={(e) => { e.stopPropagation(); setAccionPendiente('d2'); }}>
                  <span className={`font-black text-[8px] md:text-[11px] pointer-events-none transition-colors ${accionPendiente === 'd2' ? 'text-gray-900' : 'text-white/80'}`}>2 PTS</span>
                </div>
 
-               <div 
-                 className={`absolute top-[35%] bottom-[35%] right-0 w-[25%] border-2 border-white cursor-pointer transition-colors duration-200 z-20 ${accionPendiente === 'd2' ? (modoOperacion === 'sumar' ? 'bg-yellow-400' : 'bg-red-500') : 'bg-blue-800 hover:bg-blue-700'}`}
-                 onClick={(e) => { e.stopPropagation(); setAccionPendiente('d2'); }}
-               ></div>
+               <div className={`absolute top-[35%] bottom-[35%] right-0 w-[25%] border-2 border-white cursor-pointer transition-colors duration-200 z-20 ${accionPendiente === 'd2' ? (modoOperacion === 'sumar' ? 'bg-yellow-400' : 'bg-red-500') : 'bg-blue-800 hover:bg-blue-700'}`} onClick={(e) => { e.stopPropagation(); setAccionPendiente('d2'); }}></div>
 
-               {/* CÍRCULO TIRO LIBRE DERECHO */}
-               <div 
-                 className={`absolute top-1/2 right-[25%] w-9 h-9 md:w-14 md:h-14 border-[3px] border-white rounded-full -translate-y-1/2 translate-x-1/2 cursor-pointer flex items-center justify-center transition-colors duration-200 z-30 ${accionPendiente === 'tl' ? (modoOperacion === 'sumar' ? 'bg-yellow-400' : 'bg-red-500') : 'bg-red-600 hover:bg-red-500'}`}
-                 onClick={(e) => { e.stopPropagation(); setAccionPendiente('tl'); }}
-               >
+               <div className={`absolute top-1/2 right-[25%] w-9 h-9 md:w-14 md:h-14 border-[3px] border-white rounded-full -translate-y-1/2 translate-x-1/2 cursor-pointer flex items-center justify-center transition-colors duration-200 z-30 ${accionPendiente === 'tl' ? (modoOperacion === 'sumar' ? 'bg-yellow-400' : 'bg-red-500') : 'bg-red-600 hover:bg-red-500'}`} onClick={(e) => { e.stopPropagation(); setAccionPendiente('tl'); }}>
                  <span className={`font-black text-[7px] md:text-[10px] pointer-events-none transition-colors ${accionPendiente === 'tl' ? 'text-gray-900' : 'text-white'}`}>1 PT</span>
                </div>
 
@@ -645,7 +667,6 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
 
             </div>
 
-            {/* INDICADOR DE ACCIÓN */}
             <div className="mt-1 w-full h-10">
               {accionPendiente ? (
                 <div className={`${modoOperacion === 'sumar' ? 'bg-yellow-50 border-yellow-400 text-yellow-800' : 'bg-red-50 border-red-500 text-red-800'} border px-1.5 py-0.5 rounded-lg text-center shadow-sm animate-pulse h-full flex flex-col justify-center`}>
@@ -663,52 +684,29 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
           </div>
         </div>
 
-        {/* COLUMNA DERECHA: EQUIPO VISITANTE EN CANCHA */}
         <div className="w-full lg:w-[22%] lg:min-w-[180px] bg-red-50/50 rounded-xl p-1.5 lg:p-2 border-2 border-red-100 shadow-inner order-3 flex flex-col justify-start">
           <div className="w-full flex justify-between items-center mb-0.5 border-b border-red-200 pb-0.5">
-            <span className="font-black text-red-800 text-[9px] lg:text-[11px] uppercase tracking-wide truncate max-w-[75%]">
-              {partido?.visitante?.nombre || 'Visita'}
-            </span>
+            <span className="font-black text-red-800 text-[9px] lg:text-[11px] uppercase tracking-wide truncate max-w-[75%]">{partido?.visitante?.nombre || 'Visita'}</span>
             <span className="text-[7.5px] bg-red-600 text-white px-1 py-0.2 rounded">{canchaVisitante.length}/5</span>
           </div>
-          
           <div className="flex flex-row lg:flex-wrap justify-between lg:justify-center items-center gap-0.5 lg:gap-1.5 w-full flex-1 my-0.5 lg:my-2">
-            {canchaVisitante.map(jugador => (
-              <JugadorCancha key={jugador.id} jugador={jugador} equipo={partido.equipo_visitante_id} tipoEquipo="visitante" />
-            ))}
+            {canchaVisitante.map(jugador => (<JugadorCancha key={jugador.id} jugador={jugador} equipo={partido.equipo_visitante_id} tipoEquipo="visitante" />))}
           </div>
-
-          <button 
-            onClick={() => setModalBanca('visitante')}
-            className="w-full bg-red-600 hover:bg-red-700 text-white text-[9px] lg:text-[10px] font-black py-1 px-1.5 rounded-lg shadow transition-all uppercase tracking-wide flex items-center justify-center gap-1 mt-auto"
-          >
+          <button onClick={() => setModalBanca('visitante')} className="w-full bg-red-600 hover:bg-red-700 text-white text-[9px] lg:text-[10px] font-black py-1 px-1.5 rounded-lg shadow transition-all uppercase tracking-wide flex items-center justify-center gap-1 mt-auto">
             🔄 Banca ({bancaVisitante.length})
           </button>
         </div>
 
       </div>
 
-      {/* 🏀 MODAL DESPLEGABLE DE BANCA */}
       {modalBanca && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl p-5 max-w-md w-full shadow-2xl border-4 border-gray-100 flex flex-col max-h-[85vh]">
-            
             <div className="flex justify-between items-center border-b pb-3 mb-4">
-              <h3 className="font-black text-base uppercase text-gray-900">
-                Sustituciones Banca {modalBanca === 'local' ? partido?.local?.nombre : partido?.visitante?.nombre}
-              </h3>
-              <button 
-                onClick={() => setModalBanca(null)}
-                className="w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center font-black text-gray-700"
-              >
-                ✕
-              </button>
+              <h3 className="font-black text-base uppercase text-gray-900">Sustituciones Banca {modalBanca === 'local' ? partido?.local?.nombre : partido?.visitante?.nombre}</h3>
+              <button onClick={() => setModalBanca(null)} className="w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center font-black text-gray-700">✕</button>
             </div>
-
-            <p className="text-xs text-gray-500 font-bold mb-3">
-              Selecciona un jugador de la banca (ordenados por número):
-            </p>
-
+            <p className="text-xs text-gray-500 font-bold mb-3">Selecciona un jugador de la banca (ordenados por número):</p>
             <div className="overflow-y-auto flex-1 pr-1 space-y-2">
               {(modalBanca === 'local' ? bancaLocal : bancaVisitante).length === 0 ? (
                 <p className="text-center text-xs text-gray-400 py-8">No hay jugadores disponibles en la banca.</p>
@@ -716,53 +714,46 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
                 (modalBanca === 'local' ? bancaLocal : bancaVisitante).map(jugador => (
                   <div key={jugador.id} className="flex justify-between items-center bg-gray-50 hover:bg-blue-50 p-2.5 rounded-xl border border-gray-200 transition-colors">
                     <div className="flex items-center gap-3">
-                      <span className="w-8 h-8 bg-gray-900 text-white rounded-full flex items-center justify-center text-xs font-black shadow-sm">
-                        #{jugador.numero}
-                      </span>
+                      <span className="w-8 h-8 bg-gray-900 text-white rounded-full flex items-center justify-center text-xs font-black shadow-sm">#{jugador.numero}</span>
                       <span className="text-xs font-bold text-gray-800 uppercase">{jugador.nombre}</span>
                     </div>
-                    <button 
-                      onClick={() => {
-                        sustituirJugador(jugador, modalBanca, 'entrar');
-                        setModalBanca(null);
-                      }}
-                      className="bg-green-600 hover:bg-green-700 text-white text-[11px] font-black px-3 py-1.5 rounded-lg shadow transition-all uppercase"
-                    >
+                    <button onClick={() => { sustituirJugador(jugador, modalBanca, 'entrar'); setModalBanca(null); }} className="bg-green-600 hover:bg-green-700 text-white text-[11px] font-black px-3 py-1.5 rounded-lg shadow transition-all uppercase">
                       ⬆️ Entrar
                     </button>
                   </div>
                 ))
               )}
             </div>
-
             <div className="mt-4 pt-3 border-t text-center">
-              <button 
-                onClick={() => setModalBanca(null)}
-                className="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 text-xs font-black py-2.5 rounded-xl uppercase"
-              >
-                Cerrar Ventana
-              </button>
+              <button onClick={() => setModalBanca(null)} className="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 text-xs font-black py-2.5 rounded-xl uppercase">Cerrar Ventana</button>
             </div>
-
           </div>
         </div>
       )}
 
-      {/* Botones de Control de Partido (FINALIZAR Y REVERTIR) */}
-      <div className="flex flex-col items-center gap-2 mt-2 mb-2">
-        <button onClick={finalizarPartido} className="bg-gray-900 hover:bg-black text-white font-black px-4 py-2 rounded-xl shadow-md transition-all uppercase tracking-widest text-[10px] border-b-2 border-gray-700 active:border-b-0">
-          Pitar Final del Partido
-        </button>
+      <div className="flex flex-col items-center gap-3 mt-4 mb-4">
+        {partido?.estado === 'suspendido' ? (
+          <button onClick={reanudarPartido} className="bg-green-600 hover:bg-green-700 text-white font-black px-6 py-3 rounded-xl shadow-md transition-all uppercase tracking-widest text-xs border-b-4 border-green-800 active:border-b-0">
+            ▶️ Reanudar Partido
+          </button>
+        ) : (
+          <div className="flex gap-2 w-full justify-center">
+            <button onClick={finalizarPartido} className="bg-gray-900 hover:bg-black text-white font-black px-4 py-2 rounded-xl shadow-md transition-all uppercase tracking-widest text-[10px] border-b-2 border-gray-700 active:border-b-0">
+              🏁 Pitar Final
+            </button>
+            <button onClick={suspenderPartido} className="bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-black px-4 py-2 rounded-xl shadow-md transition-all uppercase tracking-widest text-[10px] border-b-2 border-yellow-700 active:border-b-0">
+              ⏸️ Suspender
+            </button>
+          </div>
+        )}
         
         {partido?.estado === 'en curso' && (
-          <button 
-            onClick={revertirAProgramado} 
-            className="text-gray-500 hover:text-red-600 text-[9px] font-bold underline transition-colors"
-          >
+          <button onClick={revertirAProgramado} className="text-gray-500 hover:text-red-600 text-[9px] font-bold underline transition-colors">
             ⏪ Devolver partido a "Programado"
           </button>
         )}
       </div>
+
     </main>
   );
 }
