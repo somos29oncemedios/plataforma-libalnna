@@ -14,7 +14,7 @@ export default function PanelEmparejamientos() {
   // Estados para agendar nuevos partidos
   const [borradores, setDrafts] = useState<any>({});
 
-  // 🔥 NUEVOS ESTADOS PARA REPROGRAMAR/EDITAR PARTIDOS EXISTENTES
+  // Estados para REPROGRAMAR/EDITAR
   const [partidoEditando, setPartidoEditando] = useState<string | null>(null);
   const [datosEdicion, setDatosEdicion] = useState<{fecha: string, hora: string, lugar: string}>({fecha: '', hora: '', lugar: ''});
 
@@ -151,7 +151,7 @@ export default function PanelEmparejamientos() {
     }
   };
 
-  // 🏀 FUNCIONES DE ACCIÓN: EDITAR PARTIDOS EXISTENTES
+  // 🏀 FUNCIONES DE ACCIÓN: EDITAR Y ELIMINAR PARTIDOS EXISTENTES
 
   const iniciarEdicion = (partido: any) => {
     setPartidoEditando(partido.id);
@@ -187,7 +187,21 @@ export default function PanelEmparejamientos() {
     } else {
       alert("✅ Partido actualizado y reprogramado correctamente.");
       setPartidoEditando(null);
-      cargarDatos(); // Refresca la información del calendario
+      cargarDatos();
+    }
+  };
+
+  const eliminarPartido = async (id: string) => {
+    const confirmar = window.confirm("⚠️ ¿Estás seguro de que deseas ELIMINAR este partido? Volverá a la lista de pendientes por agendar.");
+    if (!confirmar) return;
+
+    const { error } = await supabase.from('partidos').delete().eq('id', id);
+
+    if (error) {
+      alert(`❌ Error al eliminar el partido: ${error.message}`);
+    } else {
+      alert("🗑️ Partido eliminado correctamente.");
+      cargarDatos();
     }
   };
 
@@ -329,15 +343,24 @@ export default function PanelEmparejamientos() {
                 {programados.map((partido: any) => (
                   <div key={partido.id} className="bg-white border-2 border-gray-200 rounded-xl p-4 flex flex-col gap-3 shadow-sm hover:shadow-md transition-shadow relative">
                     
-                    {/* Botón de Editar si está suspendido o programado */}
+                    {/* Botones de Editar y Eliminar si está suspendido o programado */}
                     {(partido.estado === 'programado' || partido.estado === 'suspendido') && partidoEditando !== partido.id && (
-                      <button 
-                        onClick={() => iniciarEdicion(partido)}
-                        className="absolute top-2 right-2 text-gray-400 hover:text-blue-600 bg-gray-50 hover:bg-blue-50 p-1.5 rounded-md transition-colors"
-                        title="Modificar partido"
-                      >
-                        ✏️
-                      </button>
+                      <div className="absolute top-2 right-2 flex gap-1">
+                        <button 
+                          onClick={() => iniciarEdicion(partido)}
+                          className="text-gray-400 hover:text-blue-600 bg-gray-50 hover:bg-blue-50 p-1.5 rounded-md transition-colors"
+                          title="Modificar partido"
+                        >
+                          ✏️
+                        </button>
+                        <button 
+                          onClick={() => eliminarPartido(partido.id)}
+                          className="text-gray-400 hover:text-red-600 bg-gray-50 hover:bg-red-50 p-1.5 rounded-md transition-colors"
+                          title="Eliminar partido"
+                        >
+                          🗑️
+                        </button>
+                      </div>
                     )}
 
                     {/* MODO EDICIÓN */}
@@ -383,7 +406,7 @@ export default function PanelEmparejamientos() {
                     ) : (
                       /* MODO VISTA NORMAL */
                       <>
-                        <div className="flex justify-between items-center border-b border-gray-200 pb-2 pr-6">
+                        <div className="flex justify-between items-center border-b border-gray-200 pb-2 pr-12">
                           <span className="font-bold text-[10px] text-gray-500 uppercase tracking-widest">{partido.fecha}</span>
                           
                           {partido.estado === 'suspendido' ? (
@@ -395,7 +418,7 @@ export default function PanelEmparejamientos() {
                           )}
                         </div>
                         
-                        <div className="flex justify-between items-center px-2">
+                        <div className="flex justify-between items-center px-2 mt-1">
                           <span className="font-black text-gray-900 text-xs uppercase w-[40%] truncate text-left">{partido.local?.nombre}</span>
                           <span className="text-gray-400 font-black text-[10px] w-[20%] text-center">VS</span>
                           <span className="font-black text-gray-900 text-xs uppercase w-[40%] text-right truncate">{partido.visitante?.nombre}</span>
