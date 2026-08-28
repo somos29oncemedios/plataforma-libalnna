@@ -60,7 +60,6 @@ export default function Calendario() {
     : partidos.filter(partido => partido.categoria === categoriaActiva);
 
   // 2. Filtrar por Sección (Próximos vs Resultados)
-  // 🔥 AJUSTE: Los partidos suspendidos ahora se van a Resultados
   let partidosAMostrar = partidosPorCategoria.filter(partido => {
     if (seccionActiva === "resultados") {
       return partido.estado === "finalizado" || partido.estado === "suspendido";
@@ -153,120 +152,113 @@ export default function Calendario() {
       ) : (
         <div className="flex flex-col gap-8 md:gap-12">
           {Object.entries(partidosAgrupados).map(([fecha, sedes]: [string, any]) => (
-            <div key={fecha} className="flex flex-col gap-3 md:gap-4">
+            <div key={fecha} className="flex flex-col gap-6 md:gap-8">
               
-              {/* Título Principal: DÍA */}
-              <div className="inline-block self-center md:self-start border-b-2 border-gray-900 pb-2 w-full">
-                <h2 className="text-lg md:text-2xl font-black text-gray-900 uppercase tracking-wide flex items-center gap-2">
-                  📅 <span>{formatearFecha(fecha)}</span>
-                </h2>
-              </div>
+              {/* Sedes dentro de ese Día (Sin título gigante duplicado) */}
+              {Object.entries(sedes).map(([sede, partidosDeSede]: [string, any]) => (
+                <div key={sede} className="flex flex-col gap-3">
+                  
+                  {/* 🔥 Subtítulo: SEDE CON ETIQUETA DE FECHA (Única referencia) */}
+                  <div className="flex items-center flex-wrap gap-2 border-b border-gray-200 pb-2">
+                    <span className="text-lg md:text-xl hidden sm:inline-block">📍</span>
+                    <h3 className="text-sm md:text-xl font-bold text-gray-800 uppercase tracking-wide flex items-center flex-wrap gap-2">
+                      <span>Sede: <span className="text-blue-600">{sede}</span></span>
+                      <span className="text-gray-300 text-sm hidden md:inline-block">|</span>
+                      <span className="text-gray-500 text-[10px] md:text-xs bg-gray-100 px-2 py-1 rounded-md tracking-normal normal-case font-bold border border-gray-200 shadow-sm">
+                        📅 {formatearFecha(fecha)}
+                      </span>
+                    </h3>
+                  </div>
 
-              {/* Sedes dentro de ese Día */}
-              <div className="flex flex-col gap-6 pl-0 md:pl-4 mt-1">
-                {Object.entries(sedes).map(([sede, partidosDeSede]: [string, any]) => (
-                  <div key={sede} className="flex flex-col gap-3">
-                    
-                    {/* Subtítulo: SEDE */}
-                    <div className="flex items-center gap-2 border-b border-gray-200 pb-1.5">
-                      <span className="text-lg md:text-xl">📍</span>
-                      <h3 className="text-base md:text-xl font-bold text-gray-800 uppercase tracking-wide">
-                        Sede: <span className="text-blue-600">{sede}</span>
-                      </h3>
-                    </div>
+                  {/* Partidos de esa Sede */}
+                  <div className="flex flex-col gap-3 md:gap-6 mt-1">
+                    {partidosDeSede.map((partido: any) => (
+                      <div key={partido.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
+                        
+                        <div className="bg-gray-50 px-3 py-2 md:px-6 md:py-3 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-1 text-center sm:text-left">
+                          <span className="font-black text-blue-600 text-[11px] md:text-sm tracking-wide">
+                            ⏱️ {formatearHora(partido.hora)}
+                          </span>
+                          <span className="text-[9px] md:text-xs font-semibold text-gray-500 flex flex-wrap justify-center sm:justify-end items-center gap-1 uppercase tracking-wider">
+                            <span className="text-blue-600 font-bold">{partido.categoria}</span> 
+                            <span className="hidden sm:inline">•</span> 
+                            <span>{partido.fase_torneo}</span>
+                          </span>
+                        </div>
 
-                    {/* Partidos de esa Sede */}
-                    <div className="flex flex-col gap-3 md:gap-6 mt-1">
-                      {partidosDeSede.map((partido: any) => (
-                        <div key={partido.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
+                        <div className="px-2 py-3 md:px-6 md:py-8 grid grid-cols-3 items-start w-full gap-1 md:gap-2">
                           
-                          <div className="bg-gray-50 px-3 py-2 md:px-6 md:py-3 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-1 text-center sm:text-left">
-                            <span className="font-black text-blue-600 text-[11px] md:text-sm tracking-wide">
-                              ⏱️ {formatearHora(partido.hora)}
-                            </span>
-                            <span className="text-[9px] md:text-xs font-semibold text-gray-500 flex flex-wrap justify-center sm:justify-end items-center gap-1 uppercase tracking-wider">
-                              <span className="text-blue-600 font-bold">{partido.categoria}</span> 
-                              <span className="hidden sm:inline">•</span> 
-                              <span>{partido.fase_torneo}</span>
-                            </span>
-                          </div>
-
-                          <div className="px-2 py-3 md:px-6 md:py-8 grid grid-cols-3 items-start w-full gap-1 md:gap-2">
-                            
-                            <div className="flex flex-col items-center gap-1 md:gap-3">
-                              <div className="w-10 h-10 sm:w-16 sm:h-16 md:w-20 md:h-20 bg-gray-50 rounded-full flex items-center justify-center border-2 border-gray-100 shrink-0 overflow-hidden shadow-sm">
-                                {partido.local?.logo_url ? (
-                                  <img src={partido.local.logo_url} alt={partido.local.nombre} className="w-full h-full object-contain p-1" />
-                                ) : (
-                                  <span className="text-gray-300 font-black text-lg md:text-2xl">{partido.local?.nombre?.charAt(0) || 'L'}</span>
-                                )}
-                              </div>
-                              <span className="font-bold text-gray-900 text-[9px] sm:text-sm md:text-base text-center uppercase leading-tight px-0.5">
-                                {partido.local?.nombre || 'Local'}
-                              </span>
-                            </div>
-
-                            <div className="flex flex-col items-center justify-start pt-1 md:pt-4">
-                              {/* 🔥 NUEVA LÓGICA DE RENDERIZADO PARA INCLUIR ESTADO "SUSPENDIDO" */}
-                              {partido.estado === "finalizado" ? (
-                                <>
-                                  <div className="flex items-center gap-1 sm:gap-2 md:gap-4">
-                                    <span className="text-xl sm:text-3xl md:text-5xl font-black text-gray-900 tracking-tighter">{partido.puntos_local ?? 0}</span>
-                                    <span className="text-gray-300 font-black text-sm md:text-2xl">-</span>
-                                    <span className="text-xl sm:text-3xl md:text-5xl font-black text-gray-900 tracking-tighter">{partido.puntos_visitante ?? 0}</span>
-                                  </div>
-                                  <span className="mt-1 md:mt-2 text-[7px] md:text-xs font-bold text-gray-400 bg-gray-50 px-1.5 py-0.5 md:px-3 md:py-1 rounded-full border border-gray-100 text-center leading-none">FINALIZADO</span>
-                                </>
-                              ) : partido.estado === "suspendido" ? (
-                                <>
-                                  <div className="flex items-center gap-1 sm:gap-2 md:gap-4">
-                                    <span className="text-xl sm:text-3xl md:text-5xl font-black text-gray-400 tracking-tighter">{partido.puntos_local ?? 0}</span>
-                                    <span className="text-gray-300 font-black text-sm md:text-2xl">-</span>
-                                    <span className="text-xl sm:text-3xl md:text-5xl font-black text-gray-400 tracking-tighter">{partido.puntos_visitante ?? 0}</span>
-                                  </div>
-                                  <span className="mt-1 md:mt-2 text-[7px] md:text-xs font-bold text-yellow-800 bg-yellow-100 px-1.5 py-0.5 md:px-3 md:py-1 rounded-full border border-yellow-300 text-center leading-none shadow-sm">SUSPENDIDO</span>
-                                </>
-                              ) : partido.estado === "en curso" ? (
-                                <>
-                                  <div className="flex items-center gap-1 sm:gap-2 md:gap-4">
-                                    <span className="text-xl sm:text-3xl md:text-5xl font-black text-gray-900 tracking-tighter">{partido.puntos_local ?? 0}</span>
-                                    <span className="text-gray-300 font-black text-sm md:text-2xl">-</span>
-                                    <span className="text-xl sm:text-3xl md:text-5xl font-black text-gray-900 tracking-tighter">{partido.puntos_visitante ?? 0}</span>
-                                  </div>
-                                  <div className="mt-1 md:mt-2 flex flex-col items-center gap-0.5 md:gap-1">
-                                    <span className="text-[8px] md:text-xs font-black text-red-500 animate-pulse flex items-center gap-1"><span className="w-1.5 h-1.5 md:w-2 md:h-2 bg-red-500 rounded-full"></span> EN VIVO</span>
-                                  </div>
-                                </>
+                          <div className="flex flex-col items-center gap-1 md:gap-3">
+                            <div className="w-10 h-10 sm:w-16 sm:h-16 md:w-20 md:h-20 bg-gray-50 rounded-full flex items-center justify-center border-2 border-gray-100 shrink-0 overflow-hidden shadow-sm">
+                              {partido.local?.logo_url ? (
+                                <img src={partido.local.logo_url} alt={partido.local.nombre} className="w-full h-full object-contain p-1" />
                               ) : (
-                                <>
-                                  <span className="text-xl sm:text-3xl md:text-5xl font-black text-gray-200">VS</span>
-                                  <span className="mt-1 md:mt-2 text-[7px] md:text-xs font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 md:px-3 md:py-1 rounded-full border border-blue-200 text-center leading-none">POR JUGAR</span>
-                                </>
+                                <span className="text-gray-300 font-black text-lg md:text-2xl">{partido.local?.nombre?.charAt(0) || 'L'}</span>
                               )}
                             </div>
-
-                            <div className="flex flex-col items-center gap-1 md:gap-3">
-                              <div className="w-10 h-10 sm:w-16 sm:h-16 md:w-20 md:h-20 bg-gray-50 rounded-full flex items-center justify-center border-2 border-gray-100 shrink-0 overflow-hidden shadow-sm">
-                                {partido.visitante?.logo_url ? (
-                                  <img src={partido.visitante.logo_url} alt={partido.visitante.nombre} className="w-full h-full object-contain p-1" />
-                                ) : (
-                                  <span className="text-gray-300 font-black text-lg md:text-2xl">{partido.visitante?.nombre?.charAt(0) || 'V'}</span>
-                                )}
-                              </div>
-                              <span className="font-bold text-gray-900 text-[9px] sm:text-sm md:text-base text-center uppercase leading-tight px-0.5">
-                                {partido.visitante?.nombre || 'Visitante'}
-                              </span>
-                            </div>
-
+                            <span className="font-bold text-gray-900 text-[9px] sm:text-sm md:text-base text-center uppercase leading-tight px-0.5">
+                              {partido.local?.nombre || 'Local'}
+                            </span>
                           </div>
+
+                          <div className="flex flex-col items-center justify-start pt-1 md:pt-4">
+                            {partido.estado === "finalizado" ? (
+                              <>
+                                <div className="flex items-center gap-1 sm:gap-2 md:gap-4">
+                                  <span className="text-xl sm:text-3xl md:text-5xl font-black text-gray-900 tracking-tighter">{partido.puntos_local ?? 0}</span>
+                                  <span className="text-gray-300 font-black text-sm md:text-2xl">-</span>
+                                  <span className="text-xl sm:text-3xl md:text-5xl font-black text-gray-900 tracking-tighter">{partido.puntos_visitante ?? 0}</span>
+                                </div>
+                                <span className="mt-1 md:mt-2 text-[7px] md:text-xs font-bold text-gray-400 bg-gray-50 px-1.5 py-0.5 md:px-3 md:py-1 rounded-full border border-gray-100 text-center leading-none">FINALIZADO</span>
+                              </>
+                            ) : partido.estado === "suspendido" ? (
+                              <>
+                                <div className="flex items-center gap-1 sm:gap-2 md:gap-4">
+                                  <span className="text-xl sm:text-3xl md:text-5xl font-black text-gray-400 tracking-tighter">{partido.puntos_local ?? 0}</span>
+                                  <span className="text-gray-300 font-black text-sm md:text-2xl">-</span>
+                                  <span className="text-xl sm:text-3xl md:text-5xl font-black text-gray-400 tracking-tighter">{partido.puntos_visitante ?? 0}</span>
+                                </div>
+                                <span className="mt-1 md:mt-2 text-[7px] md:text-xs font-bold text-yellow-800 bg-yellow-100 px-1.5 py-0.5 md:px-3 md:py-1 rounded-full border border-yellow-300 text-center leading-none shadow-sm">SUSPENDIDO</span>
+                              </>
+                            ) : partido.estado === "en curso" ? (
+                              <>
+                                <div className="flex items-center gap-1 sm:gap-2 md:gap-4">
+                                  <span className="text-xl sm:text-3xl md:text-5xl font-black text-gray-900 tracking-tighter">{partido.puntos_local ?? 0}</span>
+                                  <span className="text-gray-300 font-black text-sm md:text-2xl">-</span>
+                                  <span className="text-xl sm:text-3xl md:text-5xl font-black text-gray-900 tracking-tighter">{partido.puntos_visitante ?? 0}</span>
+                                </div>
+                                <div className="mt-1 md:mt-2 flex flex-col items-center gap-0.5 md:gap-1">
+                                  <span className="text-[8px] md:text-xs font-black text-red-500 animate-pulse flex items-center gap-1"><span className="w-1.5 h-1.5 md:w-2 md:h-2 bg-red-500 rounded-full"></span> EN VIVO</span>
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <span className="text-xl sm:text-3xl md:text-5xl font-black text-gray-200">VS</span>
+                                <span className="mt-1 md:mt-2 text-[7px] md:text-xs font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 md:px-3 md:py-1 rounded-full border border-blue-200 text-center leading-none">POR JUGAR</span>
+                              </>
+                            )}
+                          </div>
+
+                          <div className="flex flex-col items-center gap-1 md:gap-3">
+                            <div className="w-10 h-10 sm:w-16 sm:h-16 md:w-20 md:h-20 bg-gray-50 rounded-full flex items-center justify-center border-2 border-gray-100 shrink-0 overflow-hidden shadow-sm">
+                              {partido.visitante?.logo_url ? (
+                                <img src={partido.visitante.logo_url} alt={partido.visitante.nombre} className="w-full h-full object-contain p-1" />
+                              ) : (
+                                <span className="text-gray-300 font-black text-lg md:text-2xl">{partido.visitante?.nombre?.charAt(0) || 'V'}</span>
+                              )}
+                            </div>
+                            <span className="font-bold text-gray-900 text-[9px] sm:text-sm md:text-base text-center uppercase leading-tight px-0.5">
+                              {partido.visitante?.nombre || 'Visitante'}
+                            </span>
+                          </div>
+
                         </div>
-                      ))}
-                    </div>
-
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
 
+                </div>
+              ))}
             </div>
           ))}
         </div>

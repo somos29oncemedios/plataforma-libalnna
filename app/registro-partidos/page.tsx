@@ -379,7 +379,7 @@ export default function PanelEmparejamientos() {
                         </div>
                       </div>
 
-                      {/* Controles de Agendamiento (AJUSTADO PARA NO DESBORDARSE) */}
+                      {/* Controles de Agendamiento */}
                       <div className="w-full xl:w-[55%] flex flex-col sm:flex-row flex-wrap items-stretch gap-2">
                         <input 
                           type="date" 
@@ -434,8 +434,10 @@ export default function PanelEmparejamientos() {
                     <div className="flex flex-col gap-6 pl-2 md:pl-4">
                       {Object.entries(sedes).map(([sede, partidosSede]: [string, any]) => (
                         <div key={sede}>
-                          <h4 className="font-bold text-gray-700 uppercase mb-3 flex items-center gap-2 text-sm">
+                          <h4 className="font-bold text-gray-700 uppercase mb-3 flex items-center flex-wrap gap-2 text-sm">
                             📍 Sede: <span className="text-blue-600">{sede}</span>
+                            <span className="text-gray-300 text-xs hidden md:inline-block">|</span>
+                            <span className="text-gray-500 text-xs bg-gray-100 px-2 py-1 rounded-md tracking-normal">📅 {formatearFecha(fecha)}</span>
                           </h4>
                           
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -542,8 +544,10 @@ export default function PanelEmparejamientos() {
                     <div className="flex flex-col gap-6 pl-2 md:pl-4">
                       {Object.entries(sedes).map(([sede, partidosSede]: [string, any]) => (
                         <div key={sede}>
-                          <h4 className="font-bold text-gray-700 uppercase mb-3 flex items-center gap-2 text-sm">
+                          <h4 className="font-bold text-gray-700 uppercase mb-3 flex items-center flex-wrap gap-2 text-sm">
                             📍 Sede: <span className="text-blue-600">{sede}</span>
+                            <span className="text-gray-300 text-xs hidden md:inline-block">|</span>
+                            <span className="text-gray-500 text-xs bg-gray-100 px-2 py-1 rounded-md tracking-normal">📅 {formatearFecha(fecha)}</span>
                           </h4>
                           
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
