@@ -92,7 +92,6 @@ export default function PanelEmparejamientos() {
   const programados = partidosCategoria.filter(p => p.estado !== 'finalizado');
   const jugados = partidosCategoria.filter(p => p.estado === 'finalizado');
 
-  // Agrupamos las listas para la vista visual
   const programadosAgrupados = agruparPartidos(programados);
   const jugadosAgrupados = agruparPartidos(jugados);
 
@@ -262,7 +261,7 @@ export default function PanelEmparejamientos() {
   };
 
   return (
-    <main className="container mx-auto px-4 py-12 max-w-5xl">
+    <main className="container mx-auto px-4 py-12 max-w-6xl">
       <div className="text-center mb-6">
         <h1 className="text-3xl md:text-4xl font-black text-gray-900 uppercase tracking-tight">
           Generador de Temporada Regular
@@ -343,53 +342,67 @@ export default function PanelEmparejamientos() {
                   const visitanteMostrar = isInvertido ? emp.local : emp.visitante;
 
                   return (
-                    <div key={emp.id} className="bg-white border-2 border-gray-200 rounded-xl p-4 md:p-6 flex flex-col lg:flex-row items-center gap-6 shadow-sm hover:shadow-md transition-shadow">
+                    <div key={emp.id} className="bg-white border-2 border-gray-200 rounded-xl p-4 md:p-6 flex flex-col xl:flex-row items-center gap-6 shadow-sm hover:shadow-md transition-shadow">
                       
                       {/* Visual del Partido */}
-                      <div className="flex items-center justify-between w-full lg:w-1/3 bg-gray-50 p-3 rounded-xl border border-gray-100">
-                        <div className="flex flex-col items-center gap-1 w-2/5">
+                      <div className="flex items-center justify-between w-full xl:w-[45%] bg-gray-50 p-4 rounded-xl border border-gray-100">
+                        <div className="flex flex-col items-center gap-1.5 w-[42%]">
                           <span className="text-[8px] text-gray-400 font-black uppercase">Local</span>
-                          <span className="font-black text-gray-900 text-xs text-center uppercase truncate w-full">{localMostrar.nombre}</span>
+                          <div className="w-10 h-10 md:w-12 md:h-12 bg-white rounded-full flex items-center justify-center overflow-hidden border border-gray-200 shadow-sm">
+                            {localMostrar.logo_url ? (
+                              <img src={localMostrar.logo_url} alt={localMostrar.nombre} className="w-full h-full object-contain p-0.5" />
+                            ) : (
+                              <span className="font-black text-gray-400 text-lg">{localMostrar.nombre?.charAt(0)}</span>
+                            )}
+                          </div>
+                          <span className="font-black text-gray-900 text-[10px] md:text-xs text-center uppercase leading-tight">{localMostrar.nombre}</span>
                         </div>
                         
                         <button 
                           onClick={() => invertirLocalia(emp.id)}
-                          className="text-gray-400 hover:text-blue-600 font-black text-lg w-1/5 text-center transition-transform hover:scale-110 active:scale-95"
+                          className="text-gray-400 hover:text-blue-600 font-black text-xl w-[16%] text-center transition-transform hover:scale-110 active:scale-95"
                           title="Intercambiar Local y Visitante"
                         >
                           🔄
                         </button>
                         
-                        <div className="flex flex-col items-center gap-1 w-2/5">
+                        <div className="flex flex-col items-center gap-1.5 w-[42%]">
                           <span className="text-[8px] text-gray-400 font-black uppercase">Visita</span>
-                          <span className="font-black text-gray-900 text-xs text-center uppercase truncate w-full">{visitanteMostrar.nombre}</span>
+                          <div className="w-10 h-10 md:w-12 md:h-12 bg-white rounded-full flex items-center justify-center overflow-hidden border border-gray-200 shadow-sm">
+                            {visitanteMostrar.logo_url ? (
+                              <img src={visitanteMostrar.logo_url} alt={visitanteMostrar.nombre} className="w-full h-full object-contain p-0.5" />
+                            ) : (
+                              <span className="font-black text-gray-400 text-lg">{visitanteMostrar.nombre?.charAt(0)}</span>
+                            )}
+                          </div>
+                          <span className="font-black text-gray-900 text-[10px] md:text-xs text-center uppercase leading-tight">{visitanteMostrar.nombre}</span>
                         </div>
                       </div>
 
-                      {/* Controles de Agendamiento */}
-                      <div className="flex flex-col md:flex-row w-full lg:w-2/3 gap-3">
+                      {/* Controles de Agendamiento (AJUSTADO PARA NO DESBORDARSE) */}
+                      <div className="w-full xl:w-[55%] flex flex-col sm:flex-row flex-wrap items-stretch gap-2">
                         <input 
                           type="date" 
-                          className="flex-1 border border-gray-300 rounded-lg p-2.5 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                          className="flex-1 min-w-[130px] border border-gray-300 rounded-lg p-2.5 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                           value={borradores[emp.id]?.fecha || ''}
                           onChange={(e) => actualizarBorrador(emp.id, 'fecha', e.target.value)}
                         />
                         <input 
                           type="time" 
-                          className="flex-1 border border-gray-300 rounded-lg p-2.5 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                          className="flex-1 min-w-[100px] border border-gray-300 rounded-lg p-2.5 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                           value={borradores[emp.id]?.hora || ''}
                           onChange={(e) => actualizarBorrador(emp.id, 'hora', e.target.value)}
                         />
                         <input 
                           type="text" 
                           placeholder="Cancha / Sede"
-                          className="flex-1 border border-gray-300 rounded-lg p-2.5 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                          className="flex-1 min-w-[130px] border border-gray-300 rounded-lg p-2.5 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                           value={borradores[emp.id]?.lugar || ''}
                           onChange={(e) => actualizarBorrador(emp.id, 'lugar', e.target.value)}
                         />
                         <button 
                           onClick={() => agendarPartido(emp)}
-                          className="bg-gray-900 hover:bg-black text-white font-black px-6 py-2.5 rounded-lg uppercase tracking-wide text-xs transition-colors shadow-sm"
+                          className="w-full sm:w-auto bg-gray-900 hover:bg-black text-white font-black px-6 py-2.5 rounded-lg uppercase tracking-wide text-xs transition-colors shadow-sm shrink-0"
                         >
                           Agendar
                         </button>
@@ -425,7 +438,7 @@ export default function PanelEmparejamientos() {
                             📍 Sede: <span className="text-blue-600">{sede}</span>
                           </h4>
                           
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                             {partidosSede.map((partido: any) => (
                               <div key={partido.id} className="bg-white border-2 border-gray-200 rounded-xl p-4 flex flex-col gap-3 shadow-sm hover:shadow-md transition-shadow relative">
                                 {/* Botones de Editar y Eliminar si está suspendido o programado */}
@@ -452,9 +465,9 @@ export default function PanelEmparejamientos() {
                                 {partidoEditando === partido.id ? (
                                   <div className="flex flex-col gap-3">
                                     <div className="flex justify-between items-center px-2 bg-gray-50 p-2 rounded-lg border border-gray-200 mb-2">
-                                      <span className="font-black text-gray-900 text-[10px] uppercase truncate text-left">{partido.local?.nombre}</span>
-                                      <span className="text-gray-400 font-black text-[10px] text-center px-2">VS</span>
-                                      <span className="font-black text-gray-900 text-[10px] uppercase text-right truncate">{partido.visitante?.nombre}</span>
+                                      <span className="font-black text-gray-900 text-[10px] uppercase truncate text-left w-[40%]">{partido.local?.nombre}</span>
+                                      <span className="text-gray-400 font-black text-[10px] text-center w-[20%]">VS</span>
+                                      <span className="font-black text-gray-900 text-[10px] uppercase text-right truncate w-[40%]">{partido.visitante?.nombre}</span>
                                     </div>
                                     <input type="date" className="border border-gray-300 rounded-md p-1.5 text-xs font-bold focus:ring-2 focus:ring-blue-500" value={datosEdicion.fecha} onChange={(e) => setDatosEdicion({...datosEdicion, fecha: e.target.value})} />
                                     <div className="flex gap-2">
@@ -469,7 +482,7 @@ export default function PanelEmparejamientos() {
                                 ) : (
                                   /* MODO VISTA NORMAL */
                                   <>
-                                    <div className="flex justify-between items-center border-b border-gray-200 pb-2 pr-12">
+                                    <div className="flex justify-between items-center border-b border-gray-200 pb-2 pr-14">
                                       <span className="font-bold text-[10px] bg-blue-100 text-blue-800 px-2 py-0.5 rounded">{formatearHora(partido.hora)}</span>
                                       
                                       {partido.estado === 'suspendido' ? (
@@ -479,10 +492,22 @@ export default function PanelEmparejamientos() {
                                       ) : null}
                                     </div>
                                     
-                                    <div className="flex justify-between items-center px-2 mt-1">
-                                      <span className="font-black text-gray-900 text-xs uppercase w-[40%] truncate text-left">{partido.local?.nombre}</span>
+                                    <div className="flex justify-between items-center px-1 mt-2">
+                                      <div className="flex flex-col items-center w-[40%] gap-1">
+                                        <div className="w-8 h-8 md:w-10 md:h-10 bg-white rounded-full flex items-center justify-center overflow-hidden border border-gray-200 shadow-sm">
+                                          {partido.local?.logo_url ? <img src={partido.local.logo_url} alt={partido.local?.nombre} className="w-full h-full object-contain p-0.5" /> : <span className="font-black text-gray-400 text-xs">{partido.local?.nombre?.charAt(0)}</span>}
+                                        </div>
+                                        <span className="font-black text-gray-900 text-[9px] md:text-[10px] text-center uppercase leading-tight">{partido.local?.nombre}</span>
+                                      </div>
+                                      
                                       <span className="text-gray-400 font-black text-[10px] w-[20%] text-center">VS</span>
-                                      <span className="font-black text-gray-900 text-xs uppercase w-[40%] text-right truncate">{partido.visitante?.nombre}</span>
+                                      
+                                      <div className="flex flex-col items-center w-[40%] gap-1">
+                                        <div className="w-8 h-8 md:w-10 md:h-10 bg-white rounded-full flex items-center justify-center overflow-hidden border border-gray-200 shadow-sm">
+                                          {partido.visitante?.logo_url ? <img src={partido.visitante.logo_url} alt={partido.visitante?.nombre} className="w-full h-full object-contain p-0.5" /> : <span className="font-black text-gray-400 text-xs">{partido.visitante?.nombre?.charAt(0)}</span>}
+                                        </div>
+                                        <span className="font-black text-gray-900 text-[9px] md:text-[10px] text-center uppercase leading-tight">{partido.visitante?.nombre}</span>
+                                      </div>
                                     </div>
                                   </>
                                 )}
@@ -521,25 +546,31 @@ export default function PanelEmparejamientos() {
                             📍 Sede: <span className="text-blue-600">{sede}</span>
                           </h4>
                           
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                             {partidosSede.map((partido: any) => (
                               <div key={partido.id} className="bg-gray-100 border border-gray-300 rounded-xl p-4 flex flex-col gap-3">
                                 <div className="flex justify-between items-center border-b border-gray-300 pb-2">
-                                  <span className="font-bold text-[10px] text-gray-500 uppercase tracking-widest">{formatearHora(partido.hora)}</span>
+                                  <span className="font-bold text-[10px] bg-gray-200 text-gray-700 px-2 py-0.5 rounded">{formatearHora(partido.hora)}</span>
                                   <span className="font-black text-[9px] bg-green-200 text-green-900 px-2 py-0.5 rounded uppercase">Finalizado</span>
                                 </div>
                                 
-                                <div className="flex justify-between items-center px-2">
-                                  <div className="flex flex-col items-center w-[40%]">
-                                    <span className="font-black text-gray-900 text-xs uppercase truncate w-full text-center">{partido.local?.nombre}</span>
-                                    <span className="text-xl font-black text-gray-900 mt-1">{partido.puntos_local}</span>
+                                <div className="flex justify-between items-center px-1 mt-2">
+                                  <div className="flex flex-col items-center w-[40%] gap-1">
+                                    <div className="w-8 h-8 md:w-10 md:h-10 bg-white rounded-full flex items-center justify-center overflow-hidden border border-gray-300 shadow-sm">
+                                      {partido.local?.logo_url ? <img src={partido.local.logo_url} alt={partido.local?.nombre} className="w-full h-full object-contain p-0.5" /> : <span className="font-black text-gray-400 text-xs">{partido.local?.nombre?.charAt(0)}</span>}
+                                    </div>
+                                    <span className="font-black text-gray-900 text-[9px] md:text-[10px] text-center uppercase leading-tight">{partido.local?.nombre}</span>
+                                    <span className="text-xl font-black text-gray-900 mt-1 bg-white px-3 py-0.5 rounded-md border border-gray-200">{partido.puntos_local}</span>
                                   </div>
                                   
                                   <span className="text-gray-400 font-black text-[10px] w-[20%] text-center">-</span>
                                   
-                                  <div className="flex flex-col items-center w-[40%]">
-                                    <span className="font-black text-gray-900 text-xs uppercase truncate w-full text-center">{partido.visitante?.nombre}</span>
-                                    <span className="text-xl font-black text-gray-900 mt-1">{partido.puntos_visitante}</span>
+                                  <div className="flex flex-col items-center w-[40%] gap-1">
+                                    <div className="w-8 h-8 md:w-10 md:h-10 bg-white rounded-full flex items-center justify-center overflow-hidden border border-gray-300 shadow-sm">
+                                      {partido.visitante?.logo_url ? <img src={partido.visitante.logo_url} alt={partido.visitante?.nombre} className="w-full h-full object-contain p-0.5" /> : <span className="font-black text-gray-400 text-xs">{partido.visitante?.nombre?.charAt(0)}</span>}
+                                    </div>
+                                    <span className="font-black text-gray-900 text-[9px] md:text-[10px] text-center uppercase leading-tight">{partido.visitante?.nombre}</span>
+                                    <span className="text-xl font-black text-gray-900 mt-1 bg-white px-3 py-0.5 rounded-md border border-gray-200">{partido.puntos_visitante}</span>
                                   </div>
                                 </div>
                               </div>
