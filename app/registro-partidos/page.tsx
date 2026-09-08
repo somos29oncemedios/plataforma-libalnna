@@ -78,8 +78,49 @@ export default function PanelEmparejamientos() {
     }, {});
   };
 
-  // 🏀 MOTOR DE GENERACIÓN Y LECTURA DIRECTA
+  // 🏀 MÉTRICAS GLOBALES DE LA LIGA
+  const globalJugados = partidosTotales.filter(p => p.estado === 'finalizado').length;
+  const globalPorJugar = partidosTotales.filter(p => p.estado !== 'finalizado').length;
+  const globalTotal = partidosTotales.length;
   
+  let globalPorAgendar = 0;
+  CATEGORIAS.forEach(cat => {
+    const equiposCat = equipos.filter(e => {
+      if (Array.isArray(e.categorias)) return e.categorias.includes(cat);
+      return e.categoria === cat;
+    });
+    const isDoble = cat === "U16 Femenino" || cat === "U16 Masculino";
+    const partidosCat = partidosTotales.filter(p => p.categoria === cat);
+    const paraDescontar = [...partidosCat];
+    
+    for (let i = 0; i < equiposCat.length; i++) {
+      for (let j = 0; j < equiposCat.length; j++) {
+        if (i === j) continue;
+        if (isDoble || i < j) {
+          const idLocal = equiposCat[i].id;
+          const idVisita = equiposCat[j].id;
+          let idx = -1;
+          
+          if (isDoble) {
+            idx = paraDescontar.findIndex(p => p.equipo_local_id === idLocal && p.equipo_visitante_id === idVisita);
+          } else {
+            idx = paraDescontar.findIndex(p => 
+              (p.equipo_local_id === idLocal && p.equipo_visitante_id === idVisita) ||
+              (p.equipo_local_id === idVisita && p.equipo_visitante_id === idLocal)
+            );
+          }
+          
+          if (idx !== -1) {
+            paraDescontar.splice(idx, 1);
+          } else {
+            globalPorAgendar++;
+          }
+        }
+      }
+    }
+  });
+
+  // 🏀 MOTOR DE GENERACIÓN POR CATEGORÍA ACTIVA
   const equiposCategoria = equipos.filter(e => {
     if (Array.isArray(e.categorias)) return e.categorias.includes(categoriaActiva);
     return e.categoria === categoriaActiva;
@@ -140,7 +181,6 @@ export default function PanelEmparejamientos() {
   });
 
   // 🏀 FUNCIONES DE ACCIÓN: NUEVOS PARTIDOS
-
   const actualizarBorrador = (id: string, campo: string, valor: string) => {
     setDrafts((prev: any) => ({
       ...prev,
@@ -207,7 +247,6 @@ export default function PanelEmparejamientos() {
   };
 
   // 🏀 FUNCIONES DE ACCIÓN: EDITAR Y ELIMINAR PARTIDOS EXISTENTES
-
   const iniciarEdicion = (partido: any) => {
     setPartidoEditando(partido.id);
     setDatosEdicion({
@@ -271,6 +310,37 @@ export default function PanelEmparejamientos() {
         </p>
       </div>
 
+      {/* PANEL GLOBAL DE LA LIGA */}
+      <div className="bg-gray-900 rounded-2xl p-6 mb-8 shadow-lg text-white">
+        <h2 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4 border-b border-gray-700 pb-2">
+          Visión Global de la Liga (Todas las Categorías)
+        </h2>
+        
+        <div className="flex flex-wrap md:flex-nowrap gap-y-6 justify-around items-center">
+          
+          <div className="flex flex-col items-center w-1/2 md:w-1/4 border-r border-gray-700">
+            <span className="text-yellow-400 font-bold text-[9px] md:text-[10px] uppercase tracking-widest mb-1 px-2 text-center">Faltan por Agendar</span>
+            <span className="text-3xl md:text-4xl font-black text-yellow-500">{globalPorAgendar}</span>
+          </div>
+
+          <div className="flex flex-col items-center w-1/2 md:w-1/4 md:border-r border-gray-700">
+            <span className="text-gray-400 font-bold text-[9px] md:text-[10px] uppercase tracking-widest mb-1 px-2 text-center">Partidos Agendados</span>
+            <span className="text-3xl md:text-4xl font-black text-white">{globalTotal}</span>
+          </div>
+
+          <div className="flex flex-col items-center w-1/2 md:w-1/4 border-r border-gray-700">
+            <span className="text-blue-400 font-bold text-[9px] md:text-[10px] uppercase tracking-widest mb-1 px-2 text-center">Faltan por Jugar</span>
+            <span className="text-3xl md:text-4xl font-black text-blue-500">{globalPorJugar}</span>
+          </div>
+
+          <div className="flex flex-col items-center w-1/2 md:w-1/4">
+            <span className="text-green-400 font-bold text-[9px] md:text-[10px] uppercase tracking-widest mb-1 px-2 text-center">Ya Disputados</span>
+            <span className="text-3xl md:text-4xl font-black text-green-500">{globalJugados}</span>
+          </div>
+
+        </div>
+      </div>
+
       {/* Selector de Categorías */}
       <div className="flex overflow-x-auto gap-2 mb-6 pb-2 justify-center scrollbar-hide">
         {CATEGORIAS.map((cat) => (
@@ -306,7 +376,7 @@ export default function PanelEmparejamientos() {
       ) : (
         <div className="flex flex-col gap-10">
           
-          {/* 📊 PANEL DE MÉTRICAS (DASHBOARD) */}
+          {/* 📊 PANEL DE MÉTRICAS (CATEGORÍA ACTIVA) */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-yellow-50 border-2 border-yellow-200 rounded-2xl p-4 flex flex-col items-center justify-center shadow-sm">
               <span className="text-yellow-800 font-black text-[10px] uppercase tracking-widest">Faltan por Agendar</span>
