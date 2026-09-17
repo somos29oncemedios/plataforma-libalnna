@@ -28,7 +28,10 @@ export default function LoginAdmin() {
     } else if (data.session) {
       // Creamos la credencial manual para el middleware
       document.cookie = "libalnna_admin=true; path=/; max-age=86400";
-      router.push('/panel');
+      
+      // 🚀 SOLUCIÓN: Usamos window.location.href en lugar de router.push
+      // Esto fuerza una recarga real que envía la cookie al Middleware inmediatamente
+      window.location.href = '/panel';
     }
   };
 
