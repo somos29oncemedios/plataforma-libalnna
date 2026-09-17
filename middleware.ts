@@ -21,5 +21,6 @@ export const config = {
     '/registro-jugadores/:path*',
     '/mesa-tecnica/:path*',
     '/registro-partidos/:path*',
+    '/programar-partidos/:path*', // 🚀 Añadimos el panel de emparejamientos
   ],
 };
