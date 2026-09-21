@@ -29,15 +29,25 @@ export default function PanelDeControl() {
         .eq('id', user.id)
         .single();
 
-      if (perfil) {
-        setRol(perfil.rol);
+      // 🚀 JUGADA DE FRANQUICIA: Normalizamos el rol y aplicamos el salvavidas del Super Admin
+      let rolAsignado = 'programador'; // Rol por defecto por seguridad
 
-        // Si es programador y está intentando ver el panel principal, 
-        // lo mandamos directamente a su única sección permitida.
-        if (perfil.rol === 'programador') {
-          router.replace('/registro-partidos');
-          return;
-        }
+      if (perfil && perfil.rol) {
+        // Limpiamos espacios y mayúsculas accidentales de la base de datos
+        rolAsignado = perfil.rol.toLowerCase().trim();
+      } 
+      
+      // Si la base de datos falla (por RLS u otro error), pero eres tú, forzamos el acceso total
+      if (user.email === 'somos29once@gmail.com') {
+        rolAsignado = 'admin';
+      }
+
+      setRol(rolAsignado);
+
+      // Si definitivamente es programador, lo mandamos a su única sección permitida.
+      if (rolAsignado === 'programador') {
+        router.replace('/registro-partidos');
+        return;
       }
 
       setCargandoRol(false);
