@@ -12,10 +12,13 @@ export default function RegistroEquipos() {
   const [equipos, setEquipos] = useState<any[]>([]);
   const [nombre, setNombre] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
+  
+  // 🚀 NUEVO: Estado para manejar el archivo físico de la imagen
+  const [archivoLogo, setArchivoLogo] = useState<File | null>(null);
+  const [cargando, setCargando] = useState(false); // Para evitar doble clic al subir
+
   const [categoriasSeleccionadas, setCategoriasSeleccionadas] = useState<string[]>([]);
   const [mensaje, setMensaje] = useState('');
-  
-  // Estado para saber si estamos editando
   const [editandoId, setEditandoId] = useState<string | null>(null);
 
   const cargarEquipos = async () => {
@@ -41,25 +44,50 @@ export default function RegistroEquipos() {
 
   const guardarEquipo = async (e: React.FormEvent) => {
     e.preventDefault();
-    setMensaje('Procesando la jugada...');
+    setCargando(true);
+    setMensaje('Procesando la jugada y verificando escudo...');
 
     if (categoriasSeleccionadas.length === 0) {
       setMensaje('❌ Falta técnica: El equipo debe participar al menos en una categoría.');
+      setCargando(false);
       return;
+    }
+
+    // Por defecto, conservamos la URL anterior (ya sea el link externo viejo o uno vacío)
+    let urlFinal = logoUrl; 
+
+    // 🚀 JUGADA DE STORAGE: Si el usuario seleccionó un archivo nuevo, lo subimos
+    if (archivoLogo) {
+      const fileExt = archivoLogo.name.split('.').pop();
+      // Creamos un nombre único usando la fecha y caracteres aleatorios
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('equipos-logos')
+        .upload(fileName, archivoLogo);
+
+      if (uploadError) {
+        setMensaje(`❌ Error al subir el escudo: ${uploadError.message}`);
+        setCargando(false);
+        return;
+      }
+
+      // Obtenemos la URL pública recién generada
+      const { data: publicUrlData } = supabase.storage
+        .from('equipos-logos')
+        .getPublicUrl(fileName);
+
+      urlFinal = publicUrlData.publicUrl;
     }
 
     const datosEquipo = { 
       nombre, 
-      logo_url: logoUrl,
+      logo_url: urlFinal, // Guardamos la URL final (vieja o nueva)
       categorias: categoriasSeleccionadas 
     };
 
     if (editandoId) {
-      // 🏀 JUGADA DE EDICIÓN (UPDATE)
-      const { error } = await supabase
-        .from('equipos')
-        .update(datosEquipo)
-        .eq('id', editandoId);
+      const { error } = await supabase.from('equipos').update(datosEquipo).eq('id', editandoId);
 
       if (error) {
         setMensaje(`❌ Error al actualizar: ${error.message}`);
@@ -69,10 +97,7 @@ export default function RegistroEquipos() {
         cargarEquipos();
       }
     } else {
-      // 🏀 JUGADA DE CREACIÓN (INSERT)
-      const { error } = await supabase
-        .from('equipos')
-        .insert([datosEquipo]);
+      const { error } = await supabase.from('equipos').insert([datosEquipo]);
 
       if (error) {
         setMensaje(`❌ Error en el registro: ${error.message}`);
@@ -82,13 +107,20 @@ export default function RegistroEquipos() {
         cargarEquipos();
       }
     }
+    setCargando(false);
   };
 
   const editarEquipo = (equipo: any) => {
     setNombre(equipo.nombre);
     setLogoUrl(equipo.logo_url || '');
+    setArchivoLogo(null); // Limpiamos el archivo si había algo cargado en el input
     setCategoriasSeleccionadas(equipo.categorias || []);
     setEditandoId(equipo.id);
+    
+    // Limpiar visualmente el input de archivo
+    const fileInput = document.getElementById('input-logo') as HTMLInputElement;
+    if (fileInput) fileInput.value = '';
+
     setMensaje('✏️ Modo edición activado. Corrige los datos y haz clic en "Actualizar Club".');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -111,8 +143,14 @@ export default function RegistroEquipos() {
   const limpiarFormulario = () => {
     setNombre('');
     setLogoUrl('');
+    setArchivoLogo(null);
     setCategoriasSeleccionadas([]);
     setEditandoId(null);
+    
+    // Resetear el input tipo file
+    const fileInput = document.getElementById('input-logo') as HTMLInputElement;
+    if (fileInput) fileInput.value = '';
+
     if (mensaje.includes('Modo edición')) setMensaje('');
   };
 
@@ -146,17 +184,37 @@ export default function RegistroEquipos() {
             </div>
           </div>
 
+          {/* 🚀 NUEVO: Input de Archivo para el Logo */}
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">Enlace del Logotipo (Opcional)</label>
-            <input type="url" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="https://..." className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <label className="block text-sm font-bold text-gray-700 mb-2">Escudo del Equipo (Opcional)</label>
+            
+            {/* Aviso inteligente si estamos editando un equipo que ya tiene logo */}
+            {logoUrl && !archivoLogo && (
+              <div className="mb-3 flex items-center gap-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                <img src={logoUrl} alt="Escudo actual" className="w-12 h-12 object-contain rounded-full bg-white border border-gray-200 shadow-sm" />
+                <span className="text-sm text-blue-800 font-medium">Este equipo ya tiene un escudo. Sube uno nuevo solo si deseas cambiarlo.</span>
+              </div>
+            )}
+
+            <input 
+              id="input-logo"
+              type="file" 
+              accept="image/*"
+              onChange={(e) => setArchivoLogo(e.target.files ? e.target.files[0] : null)} 
+              className="w-full border border-gray-300 p-2 rounded-lg bg-white file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-bold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200 transition-all cursor-pointer" 
+            />
           </div>
 
           <div className="flex gap-4 mt-4">
-            <button type="submit" className={`w-full text-white font-bold py-3 rounded-lg transition-colors ${editandoId ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-blue-600 hover:bg-blue-700'}`}>
-              {editandoId ? 'Actualizar Club' : 'Inscribir Club'}
+            <button 
+              type="submit" 
+              disabled={cargando}
+              className={`w-full text-white font-bold py-3 rounded-lg transition-colors ${cargando ? 'opacity-50 cursor-not-allowed' : ''} ${editandoId ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-blue-600 hover:bg-blue-700'}`}
+            >
+              {cargando ? 'Subiendo datos...' : (editandoId ? 'Actualizar Club' : 'Inscribir Club')}
             </button>
             {editandoId && (
-              <button type="button" onClick={limpiarFormulario} className="w-1/3 bg-gray-200 text-gray-800 font-bold py-3 rounded-lg hover:bg-gray-300 transition-colors">
+              <button type="button" onClick={limpiarFormulario} disabled={cargando} className="w-1/3 bg-gray-200 text-gray-800 font-bold py-3 rounded-lg hover:bg-gray-300 transition-colors">
                 Cancelar
               </button>
             )}

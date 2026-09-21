@@ -184,14 +184,14 @@ function ListaEquipos() {
                 return (
                   <div key={jugador.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow flex flex-col">
                     
-                    {/* Foto y Número del Jugador */}
-                    <div className="relative h-36 md:h-48 bg-gray-100 flex items-center justify-center border-b border-gray-200">
+                    {/* 🚀 NUEVO: Contenedor con proporción 4:5 dinámica */}
+                    <div className="relative w-full aspect-[4/5] bg-gray-100 flex items-center justify-center border-b border-gray-200">
                       {jugador.foto_url ? (
                         <img src={jugador.foto_url} alt={jugador.nombre} className="w-full h-full object-cover" />
                       ) : (
                         <span className="text-gray-300 font-black text-4xl md:text-6xl">#{jugador.numero}</span>
                       )}
-                      <div className="absolute bottom-[-12px] md:bottom-[-16px] right-2 md:right-4 w-8 h-8 md:w-10 md:h-10 bg-blue-600 text-white rounded-lg flex items-center justify-center font-black shadow-sm transform -rotate-3 border-2 border-white text-xs md:text-base">
+                      <div className="absolute bottom-[-12px] md:bottom-[-16px] right-2 md:right-4 w-8 h-8 md:w-10 md:h-10 bg-blue-600 text-white rounded-lg flex items-center justify-center font-black shadow-sm transform -rotate-3 border-2 border-white text-xs md:text-base z-10">
                         {jugador.numero}
                       </div>
                     </div>

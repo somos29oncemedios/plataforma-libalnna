@@ -11,7 +11,7 @@ const CATEGORIAS_DISPONIBLES = [
 ];
 
 // 🏀 Configuración del Bucket
-const NOMBRE_BUCKET = 'fotos_jugadores';
+const NOMBRE_BUCKET = 'atletas-fotos';
 
 // 🏀 Convertidor de Imágenes para PDF
 const obtenerBase64 = (url: string): Promise<string> => {
@@ -81,9 +81,13 @@ export default function RegistroJugadores() {
   const [numero, setNumero] = useState('');
   const [equipoId, setEquipoId] = useState('');
   const [fotoUrl, setFotoUrl] = useState('');
+  
+  // 🚀 NUEVO: Estado para manejar el archivo físico de la foto
+  const [archivoFoto, setArchivoFoto] = useState<File | null>(null);
+
   const [categoriasSeleccionadas, setCategoriasSeleccionadas] = useState<string[]>([]);
   const [mensaje, setMensaje] = useState('');
-  const [subiendoFoto, setSubiendoFoto] = useState(false);
+  const [procesando, setProcesando] = useState(false);
 
   // Estados de Filtros
   const [filtroBusqueda, setFiltroBusqueda] = useState('');
@@ -129,62 +133,58 @@ export default function RegistroJugadores() {
     );
   };
 
-  // 🏀 Procesador de subida de imagen
-  const manejarSubidaFoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const archivo = e.target.files?.[0];
-    if (!archivo) return;
-
-    setMensaje('⏳ Optimizando y subiendo fotografía...');
-    setSubiendoFoto(true);
-
-    try {
-      const imagenComprimida = await comprimirImagen(archivo);
-      const nombreArchivo = `${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
-
-      const { error: uploadError } = await supabase.storage
-        .from(NOMBRE_BUCKET)
-        .upload(nombreArchivo, imagenComprimida, {
-          contentType: 'image/jpeg',
-          upsert: false
-        });
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from(NOMBRE_BUCKET)
-        .getPublicUrl(nombreArchivo);
-
-      setFotoUrl(publicUrl);
-      setMensaje('✅ ¡Fotografía lista!');
-      
-      // Limpia el input para permitir subir otra si se desea
-      e.target.value = '';
-    } catch (error: any) {
-      setMensaje(`❌ Error al subir: ${error.message}`);
-    } finally {
-      setSubiendoFoto(false);
-    }
-  };
-
   const guardarJugador = async (e: React.FormEvent) => {
     e.preventDefault();
-    setMensaje('Procesando la jugada...');
+    setProcesando(true);
+    setMensaje('Procesando la jugada y verificando fotografía...');
 
     if (!equipoId) {
       setMensaje('❌ Falta técnica: Debes seleccionar un equipo.');
+      setProcesando(false);
       return;
     }
 
     if (categoriasSeleccionadas.length === 0) {
       setMensaje('❌ Falta técnica: El jugador debe pertenecer al menos a una categoría.');
+      setProcesando(false);
       return;
+    }
+
+    // Por defecto, conservamos la URL anterior
+    let urlFinal = fotoUrl;
+
+    // 🚀 JUGADA DE STORAGE: Si hay un archivo nuevo, lo comprimimos y subimos
+    if (archivoFoto) {
+      try {
+        const imagenComprimida = await comprimirImagen(archivoFoto);
+        const nombreArchivo = `${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
+
+        const { error: uploadError } = await supabase.storage
+          .from(NOMBRE_BUCKET)
+          .upload(nombreArchivo, imagenComprimida, {
+            contentType: 'image/jpeg',
+            upsert: false
+          });
+
+        if (uploadError) throw uploadError;
+
+        const { data: publicUrlData } = supabase.storage
+          .from(NOMBRE_BUCKET)
+          .getPublicUrl(nombreArchivo);
+
+        urlFinal = publicUrlData.publicUrl;
+      } catch (error: any) {
+        setMensaje(`❌ Error al subir la foto: ${error.message}`);
+        setProcesando(false);
+        return;
+      }
     }
 
     const datosJugador = { 
       nombre, 
       numero, 
       equipo_id: equipoId, 
-      foto_url: fotoUrl,
+      foto_url: urlFinal, // Guardamos la URL final
       categorias: categoriasSeleccionadas 
     };
 
@@ -205,6 +205,7 @@ export default function RegistroJugadores() {
         cargarDatos();
       }
     }
+    setProcesando(false);
   };
 
   const editarJugador = (jugador: any) => {
@@ -212,8 +213,13 @@ export default function RegistroJugadores() {
     setNumero(jugador.numero);
     setEquipoId(jugador.equipo_id);
     setFotoUrl(jugador.foto_url || '');
+    setArchivoFoto(null);
     setCategoriasSeleccionadas(jugador.categorias || []);
     setEditandoId(jugador.id);
+    
+    const fileInput = document.getElementById('input-foto-atleta') as HTMLInputElement;
+    if (fileInput) fileInput.value = '';
+
     setMensaje('✏️ Modo edición activado. Corrige los datos y haz clic en "Actualizar Atleta".');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -237,8 +243,13 @@ export default function RegistroJugadores() {
     setNumero('');
     setEquipoId('');
     setFotoUrl('');
+    setArchivoFoto(null);
     setCategoriasSeleccionadas([]);
     setEditandoId(null);
+    
+    const fileInput = document.getElementById('input-foto-atleta') as HTMLInputElement;
+    if (fileInput) fileInput.value = '';
+
     if (mensaje.includes('Modo edición')) setMensaje('');
   };
 
@@ -292,12 +303,13 @@ export default function RegistroJugadores() {
       head: [['Foto', 'N#', 'Nombre Completo', 'Club', 'Categorías']],
       body: cuerpoTabla,
       headStyles: { fillColor: [37, 99, 235] },
-      bodyStyles: { minCellHeight: 22, valign: 'middle' },
+      bodyStyles: { minCellHeight: 24, valign: 'middle' },
       didDrawCell: (data) => {
         if (data.column.index === 0 && data.cell.section === 'body') {
           const rowIndex = data.row.index;
           if (fotosBase64[rowIndex]) {
-            doc.addImage(fotosBase64[rowIndex], 'JPEG', data.cell.x + 3, data.cell.y + 2, 16, 18);
+            // 🚀 Formato 4:5 ajustado en el PDF (16x20)
+            doc.addImage(fotosBase64[rowIndex], 'JPEG', data.cell.x + 3, data.cell.y + 2, 16, 20);
           }
         }
       }
@@ -354,40 +366,37 @@ export default function RegistroJugadores() {
 
           <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
             <label className="block text-sm font-bold text-blue-900 mb-2">Fotografía del Atleta</label>
+            
+            {/* 🚀 NUEVO: Aviso inteligente de edición en formato retrato 4:5 */}
+            {fotoUrl && !archivoFoto && (
+              <div className="mb-3 flex items-center gap-3 p-3 bg-white rounded-lg border border-blue-200">
+                <img src={fotoUrl} alt="Foto actual" className="w-16 h-20 object-cover rounded-md border-2 border-gray-300 shadow-sm" />
+                <span className="text-sm text-blue-800 font-medium">Este atleta ya tiene una foto. Sube una nueva solo si deseas reemplazarla.</span>
+              </div>
+            )}
+
             <div className="flex flex-col sm:flex-row items-center gap-4">
               <input 
+                id="input-foto-atleta"
                 type="file" 
                 accept="image/*"
-                onChange={manejarSubidaFoto}
-                disabled={subiendoFoto}
-                className="w-full sm:w-2/3 border border-blue-200 bg-white p-2 rounded-lg text-sm focus:outline-none file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-bold file:bg-blue-600 file:text-white hover:file:bg-blue-700 transition-all cursor-pointer"
+                onChange={(e) => setArchivoFoto(e.target.files ? e.target.files[0] : null)}
+                disabled={procesando}
+                className="w-full border border-blue-200 bg-white p-2 rounded-lg text-sm focus:outline-none file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-bold file:bg-blue-600 file:text-white hover:file:bg-blue-700 transition-all cursor-pointer"
               />
-              {fotoUrl && (
-                <div className="relative w-16 h-16 rounded-lg overflow-hidden border-2 border-green-500 shadow-sm shrink-0">
-                  <img src={fotoUrl} alt="Vista previa" className="w-full h-full object-cover" />
-                  <button 
-                    type="button" 
-                    onClick={() => setFotoUrl('')} 
-                    className="absolute top-0 right-0 bg-red-600 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-bl-lg hover:bg-red-700"
-                    title="Eliminar foto"
-                  >
-                    X
-                  </button>
-                </div>
-              )}
             </div>
           </div>
 
           <div className="flex gap-4 mt-4">
             <button 
               type="submit" 
-              disabled={subiendoFoto}
+              disabled={procesando}
               className={`w-full text-white font-bold py-3 rounded-lg transition-colors disabled:opacity-50 ${editandoId ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-blue-600 hover:bg-blue-700'}`}
             >
-              {editandoId ? 'Actualizar Atleta' : 'Inscribir Jugador'}
+              {procesando ? 'Procesando datos y foto...' : (editandoId ? 'Actualizar Atleta' : 'Inscribir Jugador')}
             </button>
             {editandoId && (
-              <button type="button" onClick={limpiarFormulario} className="w-1/3 bg-gray-200 text-gray-800 font-bold py-3 rounded-lg hover:bg-gray-300 transition-colors">
+              <button type="button" onClick={limpiarFormulario} disabled={procesando} className="w-1/3 bg-gray-200 text-gray-800 font-bold py-3 rounded-lg hover:bg-gray-300 transition-colors">
                 Cancelar
               </button>
             )}
@@ -395,7 +404,7 @@ export default function RegistroJugadores() {
         </form>
 
         {mensaje && (
-          <div className={`mt-6 text-center font-semibold p-4 rounded-lg border ${mensaje.includes('❌') ? 'bg-red-50 text-red-800 border-red-200' : mensaje.includes('✏️') ? 'bg-yellow-50 text-yellow-800 border-yellow-200' : mensaje.includes('⏳') ? 'bg-blue-50 text-blue-800 border-blue-200' : 'bg-green-50 text-green-800 border-green-200'}`}>
+          <div className={`mt-6 text-center font-semibold p-4 rounded-lg border ${mensaje.includes('❌') ? 'bg-red-50 text-red-800 border-red-200' : mensaje.includes('✏️') ? 'bg-yellow-50 text-yellow-800 border-yellow-200' : 'bg-green-50 text-green-800 border-green-200'}`}>
             {mensaje}
           </div>
         )}
@@ -475,16 +484,17 @@ export default function RegistroJugadores() {
               <div key={jugador.id} className="flex flex-col md:flex-row justify-between items-center p-4 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors gap-4">
                 
                 <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:flex-1 text-center sm:text-left">
-                  <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center shrink-0 overflow-hidden border-2 border-gray-300 shadow-sm">
+                  {/* 🚀 NUEVO: Retrato más grande (w-20 h-24 -> 80x100px aprox) en proporción 4:5 */}
+                  <div className="w-20 h-[100px] bg-gray-200 rounded-lg flex items-center justify-center shrink-0 overflow-hidden border-2 border-gray-300 shadow-sm">
                     {jugador.foto_url ? (
                       <img src={jugador.foto_url} alt={jugador.nombre} className="w-full h-full object-cover" />
                     ) : (
-                      <span className="text-gray-500 font-black text-xl">#{jugador.numero}</span>
+                      <span className="text-gray-500 font-black text-2xl">#{jugador.numero}</span>
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-lg font-black text-gray-900 truncate">
-                      {jugador.nombre} <span className="text-sm font-bold text-gray-500 ml-2">#{jugador.numero}</span>
+                    <p className="text-xl font-black text-gray-900 truncate">
+                      {jugador.nombre} <span className="text-base font-bold text-gray-500 ml-2">#{jugador.numero}</span>
                     </p>
                     <p className="text-sm font-bold text-blue-600 truncate">{jugador.equipo?.nombre || 'Sin Equipo'}</p>
                     <p className="text-xs font-semibold text-gray-500 mt-1 truncate">Cats: {jugador.categorias?.join(', ')}</p>
