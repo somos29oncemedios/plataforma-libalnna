@@ -12,6 +12,7 @@ function ListaEquipos() {
   const [equipoActivo, setEquipoActivo] = useState<any>(null);
   const [jugadores, setJugadores] = useState<any[]>([]);
   const [estadisticas, setEstadisticas] = useState<any>({});
+  const [partidos, setPartidos] = useState<any[]>([]); // NUEVO: Estado para partidos
   const [cargando, setCargando] = useState(true);
 
   // ESTADO: Categoría activa para el equipo seleccionado
@@ -50,6 +51,15 @@ function ListaEquipos() {
           });
         }
         setEstadisticas(statsMap);
+
+        // NUEVO: Cargar todos los partidos finalizados
+        const { data: partidosData } = await supabase
+          .from('partidos')
+          .select('equipo_local_id, equipo_visitante_id, puntos_local, puntos_visitante, categoria')
+          .eq('estado', 'finalizado');
+        
+        if (partidosData) setPartidos(partidosData);
+
         setCargando(false);
       }
     };
@@ -178,8 +188,41 @@ function ListaEquipos() {
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-6">
-              {rosterFiltrado.map((jugador: any) => {
+              {[...rosterFiltrado].sort((a, b) => {
+                const ordenRol: any = { 'dt': 1, 'asistente': 2, 'jugador': 3 };
+                const rolA = a.rol || 'jugador';
+                const rolB = b.rol || 'jugador';
+                return ordenRol[rolA] - ordenRol[rolB];
+              }).map((jugador: any) => {
                 const stats = estadisticas[jugador.id] || { pts: 0, tl: 0, t3: 0 };
+                const esCuerpoTecnico = jugador.rol === 'dt' || jugador.rol === 'asistente';
+                const insigniaTexto = jugador.rol === 'dt' ? 'DT' : (jugador.rol === 'asistente' ? 'AT' : jugador.numero);
+
+                // Cálculo de victorias y derrotas para el coach
+                let victoriasCoach = 0;
+                let derrotasCoach = 0;
+
+                if (esCuerpoTecnico) {
+                  partidos.forEach(p => {
+                    // Si el coach no dirige esta categoría, ignorar
+                    if (!jugador.categorias?.includes(p.categoria)) return;
+                    // Si el usuario filtró por una categoría específica, contar solo esa
+                    if (categoriaActiva !== "Todas" && p.categoria !== categoriaActiva) return;
+
+                    const esLocal = p.equipo_local_id === jugador.equipo_id;
+                    const esVisitante = p.equipo_visitante_id === jugador.equipo_id;
+
+                    if (esLocal || esVisitante) {
+                      const ganoLocal = (p.puntos_local || 0) > (p.puntos_visitante || 0);
+                      const ganoVisitante = (p.puntos_visitante || 0) > (p.puntos_local || 0);
+
+                      if (esLocal && ganoLocal) victoriasCoach++;
+                      if (esVisitante && ganoVisitante) victoriasCoach++;
+                      if (esLocal && ganoVisitante) derrotasCoach++;
+                      if (esVisitante && ganoLocal) derrotasCoach++;
+                    }
+                  });
+                }
 
                 return (
                   <div key={jugador.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow flex flex-col">
@@ -189,10 +232,12 @@ function ListaEquipos() {
                       {jugador.foto_url ? (
                         <img src={jugador.foto_url} alt={jugador.nombre} className="w-full h-full object-cover" />
                       ) : (
-                        <span className="text-gray-300 font-black text-4xl md:text-6xl">#{jugador.numero}</span>
+                        <span className={`text-gray-300 font-black ${esCuerpoTecnico ? 'text-2xl md:text-4xl' : 'text-4xl md:text-6xl'}`}>
+                          {esCuerpoTecnico ? insigniaTexto : `#${jugador.numero}`}
+                        </span>
                       )}
-                      <div className="absolute bottom-[-12px] md:bottom-[-16px] right-2 md:right-4 w-8 h-8 md:w-10 md:h-10 bg-blue-600 text-white rounded-lg flex items-center justify-center font-black shadow-sm transform -rotate-3 border-2 border-white text-xs md:text-base z-10">
-                        {jugador.numero}
+                      <div className={`absolute bottom-[-12px] md:bottom-[-16px] right-2 md:right-4 w-8 h-8 md:w-10 md:h-10 text-white rounded-lg flex items-center justify-center font-black shadow-sm transform -rotate-3 border-2 border-white text-xs md:text-base z-10 ${esCuerpoTecnico ? 'bg-purple-600' : 'bg-blue-600'}`}>
+                        {insigniaTexto}
                       </div>
                     </div>
                     
@@ -201,23 +246,41 @@ function ListaEquipos() {
                       <h3 className="font-black text-gray-900 text-sm md:text-lg uppercase tracking-tight truncate text-center md:text-left w-full" title={jugador.nombre}>
                         {jugador.nombre}
                       </h3>
+                      {esCuerpoTecnico && (
+                        <p className="text-purple-600 font-bold text-xs uppercase tracking-wider mt-1 text-center md:text-left w-full">
+                          {jugador.rol === 'dt' ? 'Director Técnico' : 'Asistente Técnico'}
+                        </p>
+                      )}
                     </div>
 
                     {/* Estadísticas Solicitadas (Totales) */}
-                    <div className="bg-gray-50 grid grid-cols-3 divide-x divide-gray-200 border-t border-gray-100 mt-auto">
-                      <div className="p-2 md:p-3 text-center">
-                        <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5 md:mb-1">PTS</p>
-                        <p className="font-bold text-gray-800 text-sm md:text-base">{stats.pts}</p>
+                    {!esCuerpoTecnico ? (
+                      <div className="bg-gray-50 grid grid-cols-3 divide-x divide-gray-200 border-t border-gray-100 mt-auto">
+                        <div className="p-2 md:p-3 text-center">
+                          <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5 md:mb-1">PTS</p>
+                          <p className="font-bold text-gray-800 text-sm md:text-base">{stats.pts}</p>
+                        </div>
+                        <div className="p-2 md:p-3 text-center">
+                          <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5 md:mb-1">T. LIBRES</p>
+                          <p className="font-bold text-gray-800 text-sm md:text-base">{stats.tl}</p>
+                        </div>
+                        <div className="p-2 md:p-3 text-center">
+                          <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5 md:mb-1">TRIPLES</p>
+                          <p className="font-bold text-gray-800 text-sm md:text-base">{stats.t3}</p>
+                        </div>
                       </div>
-                      <div className="p-2 md:p-3 text-center">
-                        <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5 md:mb-1">T. LIBRES</p>
-                        <p className="font-bold text-gray-800 text-sm md:text-base">{stats.tl}</p>
+                    ) : (
+                      <div className="bg-purple-50 grid grid-cols-2 divide-x divide-purple-200 border-t border-purple-100 mt-auto">
+                        <div className="p-2 md:p-3 text-center">
+                          <p className="text-[9px] md:text-[10px] font-black text-purple-600 uppercase tracking-widest mb-0.5 md:mb-1">Ganados</p>
+                          <p className="font-bold text-gray-900 text-sm md:text-base">{victoriasCoach}</p>
+                        </div>
+                        <div className="p-2 md:p-3 text-center">
+                          <p className="text-[9px] md:text-[10px] font-black text-purple-600 uppercase tracking-widest mb-0.5 md:mb-1">Perdidos</p>
+                          <p className="font-bold text-gray-900 text-sm md:text-base">{derrotasCoach}</p>
+                        </div>
                       </div>
-                      <div className="p-2 md:p-3 text-center">
-                        <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5 md:mb-1">TRIPLES</p>
-                        <p className="font-bold text-gray-800 text-sm md:text-base">{stats.t3}</p>
-                      </div>
-                    </div>
+                    )}
                   </div>
                 );
               })}

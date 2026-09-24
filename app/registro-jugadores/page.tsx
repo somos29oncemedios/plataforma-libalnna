@@ -81,6 +81,7 @@ export default function RegistroJugadores() {
   const [numero, setNumero] = useState('');
   const [equipoId, setEquipoId] = useState('');
   const [fotoUrl, setFotoUrl] = useState('');
+  const [rol, setRol] = useState('jugador'); // NUEVO ESTADO PARA ROL
   
   // 🚀 NUEVO: Estado para manejar el archivo físico de la foto
   const [archivoFoto, setArchivoFoto] = useState<File | null>(null);
@@ -145,7 +146,7 @@ export default function RegistroJugadores() {
     }
 
     if (categoriasSeleccionadas.length === 0) {
-      setMensaje('❌ Falta técnica: El jugador debe pertenecer al menos a una categoría.');
+      setMensaje('❌ Falta técnica: El integrante debe pertenecer al menos a una categoría.');
       setProcesando(false);
       return;
     }
@@ -182,17 +183,18 @@ export default function RegistroJugadores() {
 
     const datosJugador = { 
       nombre, 
-      numero, 
+      numero: rol === 'jugador' ? numero : null, // Solo guardamos número si es jugador
       equipo_id: equipoId, 
-      foto_url: urlFinal, // Guardamos la URL final
-      categorias: categoriasSeleccionadas 
+      foto_url: urlFinal, 
+      categorias: categoriasSeleccionadas,
+      rol // GUARDAMOS EL ROL
     };
 
     if (editandoId) {
       const { error } = await supabase.from('jugadores').update(datosJugador).eq('id', editandoId);
       if (error) setMensaje(`❌ Error al actualizar: ${error.message}`);
       else {
-        setMensaje('✅ ¡Atleta actualizado con éxito!');
+        setMensaje('✅ ¡Integrante actualizado con éxito!');
         limpiarFormulario();
         cargarDatos();
       }
@@ -200,7 +202,7 @@ export default function RegistroJugadores() {
       const { error } = await supabase.from('jugadores').insert([datosJugador]);
       if (error) setMensaje(`❌ Error en el fichaje: ${error.message}`);
       else {
-        setMensaje('✅ ¡Jugador fichado con éxito!');
+        setMensaje('✅ ¡Integrante registrado con éxito!');
         limpiarFormulario();
         cargarDatos();
       }
@@ -210,9 +212,10 @@ export default function RegistroJugadores() {
 
   const editarJugador = (jugador: any) => {
     setNombre(jugador.nombre);
-    setNumero(jugador.numero);
+    setNumero(jugador.numero || '');
     setEquipoId(jugador.equipo_id);
     setFotoUrl(jugador.foto_url || '');
+    setRol(jugador.rol || 'jugador');
     setArchivoFoto(null);
     setCategoriasSeleccionadas(jugador.categorias || []);
     setEditandoId(jugador.id);
@@ -220,19 +223,19 @@ export default function RegistroJugadores() {
     const fileInput = document.getElementById('input-foto-atleta') as HTMLInputElement;
     if (fileInput) fileInput.value = '';
 
-    setMensaje('✏️ Modo edición activado. Corrige los datos y haz clic en "Actualizar Atleta".');
+    setMensaje('✏️ Modo edición activado. Corrige los datos y haz clic en "Actualizar".');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const eliminarJugador = async (id: string) => {
-    const confirmar = window.confirm("🚨 ¿Estás seguro de que deseas eliminar a este jugador de la liga? Esta acción no se puede deshacer.");
+    const confirmar = window.confirm("🚨 ¿Estás seguro de que deseas eliminar a este integrante de la liga? Esta acción no se puede deshacer.");
     if (!confirmar) return;
 
     const { error } = await supabase.from('jugadores').delete().eq('id', id);
     if (error) {
       alert(`❌ Error al eliminar: ${error.message}`);
     } else {
-      alert("✅ ¡Jugador eliminado correctamente!");
+      alert("✅ ¡Integrante eliminado correctamente!");
       cargarDatos();
       if (editandoId === id) limpiarFormulario();
     }
@@ -243,6 +246,7 @@ export default function RegistroJugadores() {
     setNumero('');
     setEquipoId('');
     setFotoUrl('');
+    setRol('jugador');
     setArchivoFoto(null);
     setCategoriasSeleccionadas([]);
     setEditandoId(null);
@@ -343,13 +347,23 @@ export default function RegistroJugadores() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">Rol en el equipo *</label>
+              <select value={rol} onChange={(e) => setRol(e.target.value)} className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                <option value="jugador">Jugador</option>
+                <option value="dt">Director Técnico</option>
+                <option value="asistente">Asistente Técnico</option>
+              </select>
+            </div>
+            <div>
               <label className="block text-sm font-bold text-gray-700 mb-2">Nombre Completo *</label>
               <input type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej. Michael Jordan" className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
             </div>
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">Número de Camiseta *</label>
-              <input type="number" value={numero} onChange={(e) => setNumero(e.target.value)} placeholder="Ej. 23" className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
-            </div>
+            {rol === 'jugador' && (
+              <div className="md:col-span-2">
+                <label className="block text-sm font-bold text-gray-700 mb-2">Número de Camiseta *</label>
+                <input type="number" value={numero} onChange={(e) => setNumero(e.target.value)} placeholder="Ej. 23" className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required={rol === 'jugador'} />
+              </div>
+            )}
           </div>
 
           <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
@@ -489,23 +503,34 @@ export default function RegistroJugadores() {
                     {jugador.foto_url ? (
                       <img src={jugador.foto_url} alt={jugador.nombre} className="w-full h-full object-cover" />
                     ) : (
-                      <span className="text-gray-500 font-black text-2xl">#{jugador.numero}</span>
+                      <span className="text-gray-500 font-black text-xl uppercase text-center leading-tight">
+                        {jugador.rol === 'jugador' ? `#${jugador.numero}` : (jugador.rol === 'dt' ? 'DT' : 'AT')}
+                      </span>
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xl font-black text-gray-900 truncate">
-                      {jugador.nombre} <span className="text-base font-bold text-gray-500 ml-2">#{jugador.numero}</span>
-                    </p>
-                    <p className="text-sm font-bold text-blue-600 truncate">{jugador.equipo?.nombre || 'Sin Equipo'}</p>
+                    <div className="flex items-center gap-2 flex-wrap justify-center sm:justify-start">
+                      <p className="text-xl font-black text-gray-900 truncate">{jugador.nombre}</p>
+                      {jugador.rol === 'jugador' ? (
+                        <span className="text-base font-bold text-gray-500">#{jugador.numero}</span>
+                      ) : (
+                        <span className="text-xs font-black px-2 py-0.5 rounded-md uppercase tracking-wider bg-purple-100 text-purple-800">
+                          {jugador.rol === 'dt' ? 'Director Técnico' : 'Asistente Técnico'}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm font-bold text-blue-600 truncate mt-1">{jugador.equipo?.nombre || 'Sin Equipo'}</p>
                     <p className="text-xs font-semibold text-gray-500 mt-1 truncate">Cats: {jugador.categorias?.join(', ')}</p>
                   </div>
                 </div>
                 
                 <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
-                  <div className="bg-yellow-50 border border-yellow-300 px-2 py-2 rounded-xl flex flex-col items-center justify-center shadow-sm w-24 shrink-0">
-                    <span className="text-[10px] font-black text-yellow-800 uppercase tracking-wider">Total PTS</span>
-                    <span className="text-2xl font-black text-gray-900">{puntosTotales[jugador.id] || 0}</span>
-                  </div>
+                  {jugador.rol === 'jugador' && (
+                    <div className="bg-yellow-50 border border-yellow-300 px-2 py-2 rounded-xl flex flex-col items-center justify-center shadow-sm w-24 shrink-0">
+                      <span className="text-[10px] font-black text-yellow-800 uppercase tracking-wider">Total PTS</span>
+                      <span className="text-2xl font-black text-yellow-600">{puntosTotales[jugador.id] || 0}</span>
+                    </div>
+                  )}
 
                   <div className="flex gap-2 w-full sm:w-auto">
                     <button onClick={() => editarJugador(jugador)} className="bg-gray-800 hover:bg-gray-900 text-white font-bold px-4 py-2 rounded-md transition-colors w-full sm:w-auto shadow-sm">Modificar</button>
