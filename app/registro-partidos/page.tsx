@@ -82,6 +82,7 @@ export default function PanelEmparejamientos() {
   const globalJugados = partidosTotales.filter(p => p.estado === 'finalizado').length;
   const globalPorJugar = partidosTotales.filter(p => p.estado !== 'finalizado').length;
   const globalTotal = partidosTotales.length;
+  const globalBorradores = partidosTotales.filter(p => p.estado === 'borrador').length;
   
   let globalPorAgendar = 0;
   CATEGORIAS.forEach(cat => {
@@ -121,14 +122,16 @@ export default function PanelEmparejamientos() {
   });
 
   // 🏀 MOTOR DE GENERACIÓN POR CATEGORÍA ACTIVA
-  const equiposCategoria = equipos.filter(e => {
+  const equiposCategoria = categoriaActiva === "Todas" ? [] : equipos.filter(e => {
     if (Array.isArray(e.categorias)) return e.categorias.includes(categoriaActiva);
     return e.categoria === categoriaActiva;
   });
 
   const isDobleRonda = categoriaActiva === "U16 Femenino" || categoriaActiva === "U16 Masculino";
   
-  const partidosCategoria = partidosTotales.filter(p => p.categoria === categoriaActiva);
+  const partidosCategoria = categoriaActiva === "Todas" 
+    ? partidosTotales 
+    : partidosTotales.filter(p => p.categoria === categoriaActiva);
 
   const programados = partidosCategoria.filter(p => p.estado !== 'finalizado');
   const jugados = partidosCategoria.filter(p => p.estado === 'finalizado');
@@ -137,21 +140,23 @@ export default function PanelEmparejamientos() {
   const jugadosAgrupados = agruparPartidos(jugados);
 
   const emparejamientosIdeales = [];
-  for (let i = 0; i < equiposCategoria.length; i++) {
-    for (let j = 0; j < equiposCategoria.length; j++) {
-      if (i === j) continue; 
-      if (isDobleRonda) {
-        emparejamientosIdeales.push({
-          id: `${equiposCategoria[i].id}-${equiposCategoria[j].id}`,
-          local: equiposCategoria[i],
-          visitante: equiposCategoria[j]
-        });
-      } else if (i < j) {
-        emparejamientosIdeales.push({
-          id: `${equiposCategoria[i].id}-${equiposCategoria[j].id}`,
-          local: equiposCategoria[i],
-          visitante: equiposCategoria[j]
-        });
+  if (categoriaActiva !== "Todas") {
+    for (let i = 0; i < equiposCategoria.length; i++) {
+      for (let j = 0; j < equiposCategoria.length; j++) {
+        if (i === j) continue; 
+        if (isDobleRonda) {
+          emparejamientosIdeales.push({
+            id: `${equiposCategoria[i].id}-${equiposCategoria[j].id}`,
+            local: equiposCategoria[i],
+            visitante: equiposCategoria[j]
+          });
+        } else if (i < j) {
+          emparejamientosIdeales.push({
+            id: `${equiposCategoria[i].id}-${equiposCategoria[j].id}`,
+            local: equiposCategoria[i],
+            visitante: equiposCategoria[j]
+          });
+        }
       }
     }
   }
@@ -220,7 +225,7 @@ export default function PanelEmparejamientos() {
       fecha: draft.fecha,
       hora: draft.hora,
       lugar: draft.lugar,
-      estado: 'programado',
+      estado: 'borrador',
       fase_torneo: 'Temporada Regular',
       puntos_local: 0,
       puntos_visitante: 0
@@ -231,7 +236,7 @@ export default function PanelEmparejamientos() {
     if (error) {
       alert(`❌ Error técnico: ${error.message}`);
     } else {
-      alert("✅ ¡Partido agendado con éxito!");
+      alert("✅ ¡Partido agendado en borrador con éxito!");
       setDrafts((prev: any) => {
         const nuevos = { ...prev };
         delete nuevos[emparejamiento.id];
@@ -242,6 +247,23 @@ export default function PanelEmparejamientos() {
         delete nuevos[emparejamiento.id];
         return nuevos;
       });
+      cargarDatos();
+    }
+  };
+
+  const publicarCalendario = async () => {
+    const confirmar = window.confirm("¿Estás seguro de que deseas PUBLICAR todo el calendario? Los partidos en borrador pasarán a estar programados públicamente.");
+    if (!confirmar) return;
+
+    const { error } = await supabase
+      .from('partidos')
+      .update({ estado: 'programado' })
+      .eq('estado', 'borrador');
+
+    if (error) {
+      alert(`❌ Error al publicar: ${error.message}`);
+    } else {
+      alert("✅ ¡Calendario Oficial Publicado con éxito!");
       cargarDatos();
     }
   };
@@ -312,11 +334,22 @@ export default function PanelEmparejamientos() {
 
       {/* PANEL GLOBAL DE LA LIGA */}
       <div className="bg-gray-900 rounded-2xl p-6 mb-8 shadow-lg text-white">
-        <h2 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4 border-b border-gray-700 pb-2">
-          Visión Global de la Liga (Todas las Categorías)
-        </h2>
+        <div className="flex justify-between items-center mb-4 border-b border-gray-700 pb-2">
+          <h2 className="text-sm font-bold text-gray-400 uppercase tracking-widest">
+            Visión Global de la Liga (Todas las Categorías)
+          </h2>
+          {globalBorradores > 0 && (
+            <button 
+              onClick={publicarCalendario}
+              className="bg-green-600 hover:bg-green-700 text-white font-black px-4 py-2 rounded-lg text-xs uppercase tracking-wide shadow-md transition-colors animate-pulse"
+            >
+              Publicar Calendario ({globalBorradores} Borradores)
+            </button>
+          )}
+        </div>
         
         <div className="flex flex-wrap md:flex-nowrap gap-y-6 justify-around items-center">
+
           
           <div className="flex flex-col items-center w-1/2 md:w-1/4 border-r border-gray-700">
             <span className="text-yellow-400 font-bold text-[9px] md:text-[10px] uppercase tracking-widest mb-1 px-2 text-center">Faltan por Agendar</span>
@@ -343,7 +376,7 @@ export default function PanelEmparejamientos() {
 
       {/* Selector de Categorías */}
       <div className="flex overflow-x-auto gap-2 mb-6 pb-2 justify-center scrollbar-hide">
-        {CATEGORIAS.map((cat) => (
+        {["Todas", ...CATEGORIAS].map((cat) => (
           <button
             key={cat}
             onClick={() => setCategoriaActiva(cat)}
@@ -359,17 +392,19 @@ export default function PanelEmparejamientos() {
       </div>
 
       {/* REPORTE DE FORMATO DE LA CATEGORÍA */}
-      <div className="text-center mb-8">
-        <span className={`px-4 py-1.5 rounded-full text-xs font-black tracking-widest uppercase border ${
-          isDobleRonda ? 'bg-purple-100 text-purple-800 border-purple-200' : 'bg-gray-100 text-gray-800 border-gray-200'
-        }`}>
-          {isDobleRonda ? '🔁 Formato: Ida y Vuelta (Doble Ronda)' : '▶️ Formato: Todos contra Todos (Ronda Simple)'}
-        </span>
-      </div>
+      {categoriaActiva !== "Todas" && (
+        <div className="text-center mb-8">
+          <span className={`px-4 py-1.5 rounded-full text-xs font-black tracking-widest uppercase border ${
+            isDobleRonda ? 'bg-purple-100 text-purple-800 border-purple-200' : 'bg-gray-100 text-gray-800 border-gray-200'
+          }`}>
+            {isDobleRonda ? '🔁 Formato: Ida y Vuelta (Doble Ronda)' : '▶️ Formato: Todos contra Todos (Ronda Simple)'}
+          </span>
+        </div>
+      )}
 
       {cargando ? (
         <div className="text-center py-20 font-bold text-gray-500">Calculando matriz de enfrentamientos...</div>
-      ) : equiposCategoria.length < 2 ? (
+      ) : categoriaActiva !== "Todas" && equiposCategoria.length < 2 ? (
         <div className="bg-red-50 border border-red-200 text-red-700 p-6 rounded-xl text-center font-bold">
           ⚠️ No hay suficientes equipos registrados en la categoría {categoriaActiva} para generar una temporada.
         </div>
@@ -377,11 +412,13 @@ export default function PanelEmparejamientos() {
         <div className="flex flex-col gap-10">
           
           {/* 📊 PANEL DE MÉTRICAS (CATEGORÍA ACTIVA) */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-yellow-50 border-2 border-yellow-200 rounded-2xl p-4 flex flex-col items-center justify-center shadow-sm">
-              <span className="text-yellow-800 font-black text-[10px] uppercase tracking-widest">Faltan por Agendar</span>
-              <span className="text-4xl font-black text-yellow-600">{pendientes.length}</span>
-            </div>
+          <div className={`grid grid-cols-1 ${categoriaActiva === "Todas" ? "md:grid-cols-2" : "md:grid-cols-3"} gap-4`}>
+            {categoriaActiva !== "Todas" && (
+              <div className="bg-yellow-50 border-2 border-yellow-200 rounded-2xl p-4 flex flex-col items-center justify-center shadow-sm">
+                <span className="text-yellow-800 font-black text-[10px] uppercase tracking-widest">Faltan por Agendar</span>
+                <span className="text-4xl font-black text-yellow-600">{pendientes.length}</span>
+              </div>
+            )}
             <div className="bg-blue-50 border-2 border-blue-200 rounded-2xl p-4 flex flex-col items-center justify-center shadow-sm">
               <span className="text-blue-800 font-black text-[10px] uppercase tracking-widest">Ya Programados</span>
               <span className="text-4xl font-black text-blue-600">{programados.length}</span>
@@ -393,8 +430,9 @@ export default function PanelEmparejamientos() {
           </div>
           
           {/* SECCIÓN 1: EMPAREJAMIENTOS PENDIENTES */}
-          <div>
-            <div className="flex items-center gap-3 mb-6 border-b-2 border-gray-900 pb-2">
+          {categoriaActiva !== "Todas" && (
+            <div>
+              <div className="flex items-center gap-3 mb-6 border-b-2 border-gray-900 pb-2">
               <h2 className="text-xl font-black text-gray-900 uppercase tracking-wide">
                 Pendientes por Agendar
               </h2>
@@ -484,6 +522,7 @@ export default function PanelEmparejamientos() {
               </div>
             )}
           </div>
+          )}
 
           {/* SECCIÓN 2: EMPAREJAMIENTOS YA PROGRAMADOS */}
           {programados.length > 0 && (
@@ -510,32 +549,13 @@ export default function PanelEmparejamientos() {
                             <span className="text-gray-500 text-xs bg-gray-100 px-2 py-1 rounded-md tracking-normal">📅 {formatearFecha(fecha)}</span>
                           </h4>
                           
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                          <div className="flex flex-col gap-3 md:gap-6 mt-1">
                             {partidosSede.map((partido: any) => (
-                              <div key={partido.id} className="bg-white border-2 border-gray-200 rounded-xl p-4 flex flex-col gap-3 shadow-sm hover:shadow-md transition-shadow relative">
-                                {/* Botones de Editar y Eliminar si está suspendido o programado */}
-                                {(partido.estado === 'programado' || partido.estado === 'suspendido') && partidoEditando !== partido.id && (
-                                  <div className="absolute top-2 right-2 flex gap-1 z-10">
-                                    <button 
-                                      onClick={() => iniciarEdicion(partido)}
-                                      className="text-gray-400 hover:text-blue-600 bg-gray-50 hover:bg-blue-50 p-1.5 rounded-md transition-colors"
-                                      title="Modificar partido"
-                                    >
-                                      ✏️
-                                    </button>
-                                    <button 
-                                      onClick={() => eliminarPartido(partido.id)}
-                                      className="text-gray-400 hover:text-red-600 bg-gray-50 hover:bg-red-50 p-1.5 rounded-md transition-colors"
-                                      title="Eliminar partido"
-                                    >
-                                      🗑️
-                                    </button>
-                                  </div>
-                                )}
+                              <div key={partido.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow relative">
 
                                 {/* MODO EDICIÓN */}
                                 {partidoEditando === partido.id ? (
-                                  <div className="flex flex-col gap-3">
+                                  <div className="flex flex-col gap-3 p-4">
                                     <div className="flex justify-between items-center px-2 bg-gray-50 p-2 rounded-lg border border-gray-200 mb-2">
                                       <span className="font-black text-gray-900 text-[10px] uppercase truncate text-left w-[40%]">{partido.local?.nombre}</span>
                                       <span className="text-gray-400 font-black text-[10px] text-center w-[20%]">VS</span>
@@ -554,31 +574,60 @@ export default function PanelEmparejamientos() {
                                 ) : (
                                   /* MODO VISTA NORMAL */
                                   <>
-                                    <div className="flex justify-between items-center border-b border-gray-200 pb-2 pr-14">
-                                      <span className="font-bold text-[10px] bg-blue-100 text-blue-800 px-2 py-0.5 rounded">{formatearHora(partido.hora)}</span>
+                                    <div className="bg-gray-50 px-3 py-2 md:px-6 md:py-3 border-b border-gray-200 flex justify-between items-center text-center sm:text-left">
+                                      <span className="font-black text-blue-600 text-[11px] md:text-sm tracking-wide shrink-0">
+                                        ⏱️ {formatearHora(partido.hora)}
+                                      </span>
                                       
-                                      {partido.estado === 'suspendido' ? (
-                                        <span className="font-black text-[9px] bg-yellow-200 text-yellow-800 px-2 py-0.5 rounded uppercase">Suspendido</span>
-                                      ) : partido.estado === 'en curso' ? (
-                                        <span className="font-black text-[9px] bg-red-200 text-red-800 px-2 py-0.5 rounded uppercase animate-pulse">En Curso</span>
-                                      ) : null}
+                                      <div className="flex gap-2 items-center justify-end flex-wrap">
+                                        {partido.estado === 'suspendido' ? (
+                                          <span className="font-black text-[9px] md:text-xs bg-yellow-200 text-yellow-800 px-2 py-0.5 md:px-3 md:py-1 rounded-full uppercase shadow-sm">Suspendido</span>
+                                        ) : partido.estado === 'en curso' ? (
+                                          <span className="font-black text-[9px] md:text-xs bg-red-200 text-red-800 px-2 py-0.5 md:px-3 md:py-1 rounded-full uppercase animate-pulse shadow-sm flex items-center gap-1"><span className="w-1.5 h-1.5 bg-red-500 rounded-full"></span> En Curso</span>
+                                        ) : partido.estado === 'borrador' ? (
+                                          <span className="font-black text-[9px] md:text-xs bg-gray-200 text-gray-800 px-2 py-0.5 md:px-3 md:py-1 rounded-full uppercase shadow-sm">Borrador</span>
+                                        ) : (
+                                          <span className="font-black text-[9px] md:text-xs bg-blue-50 text-blue-600 px-2 py-0.5 md:px-3 md:py-1 rounded-full uppercase border border-blue-200">Programado</span>
+                                        )}
+                                        
+                                        {(partido.estado === 'programado' || partido.estado === 'suspendido' || partido.estado === 'borrador') && (
+                                          <div className="flex gap-1 ml-1 sm:ml-2 border-l border-gray-300 pl-1 sm:pl-2">
+                                            <button 
+                                              onClick={() => iniciarEdicion(partido)}
+                                              className="text-gray-400 hover:text-blue-600 bg-white hover:bg-blue-50 p-1 md:p-1.5 rounded-md transition-colors border border-gray-200 shadow-sm"
+                                              title="Modificar partido"
+                                            >
+                                              ✏️
+                                            </button>
+                                            <button 
+                                              onClick={() => eliminarPartido(partido.id)}
+                                              className="text-gray-400 hover:text-red-600 bg-white hover:bg-red-50 p-1 md:p-1.5 rounded-md transition-colors border border-gray-200 shadow-sm"
+                                              title="Eliminar partido"
+                                            >
+                                              🗑️
+                                            </button>
+                                          </div>
+                                        )}
+                                      </div>
                                     </div>
                                     
-                                    <div className="flex justify-between items-center px-1 mt-2">
-                                      <div className="flex flex-col items-center w-[40%] gap-1">
-                                        <div className="w-8 h-8 md:w-10 md:h-10 bg-white rounded-full flex items-center justify-center overflow-hidden border border-gray-200 shadow-sm">
-                                          {partido.local?.logo_url ? <img src={partido.local.logo_url} alt={partido.local?.nombre} className="w-full h-full object-contain p-0.5" /> : <span className="font-black text-gray-400 text-xs">{partido.local?.nombre?.charAt(0)}</span>}
+                                    <div className="px-2 pt-3 pb-6 md:px-6 md:pt-6 md:pb-10 grid grid-cols-3 items-start w-full gap-1 md:gap-2">
+                                      <div className="flex flex-col items-center gap-1 md:gap-3">
+                                        <div className="w-10 h-10 sm:w-16 sm:h-16 md:w-20 md:h-20 bg-gray-50 rounded-full flex items-center justify-center border-2 border-gray-100 shrink-0 overflow-hidden shadow-sm">
+                                          {partido.local?.logo_url ? <img src={partido.local.logo_url} alt={partido.local?.nombre} className="w-full h-full object-contain p-1" /> : <span className="text-gray-300 font-black text-lg md:text-2xl">{partido.local?.nombre?.charAt(0) || 'L'}</span>}
                                         </div>
-                                        <span className="font-black text-gray-900 text-[9px] md:text-[10px] text-center uppercase leading-tight">{partido.local?.nombre}</span>
+                                        <span className="font-bold text-gray-900 text-[9px] sm:text-sm md:text-base text-center uppercase leading-snug px-0.5">{partido.local?.nombre}</span>
                                       </div>
                                       
-                                      <span className="text-gray-400 font-black text-[10px] w-[20%] text-center">VS</span>
+                                      <div className="flex flex-col items-center justify-start pt-2 md:pt-6">
+                                        <span className="text-xl sm:text-3xl md:text-5xl font-black text-gray-200">VS</span>
+                                      </div>
                                       
-                                      <div className="flex flex-col items-center w-[40%] gap-1">
-                                        <div className="w-8 h-8 md:w-10 md:h-10 bg-white rounded-full flex items-center justify-center overflow-hidden border border-gray-200 shadow-sm">
-                                          {partido.visitante?.logo_url ? <img src={partido.visitante.logo_url} alt={partido.visitante?.nombre} className="w-full h-full object-contain p-0.5" /> : <span className="font-black text-gray-400 text-xs">{partido.visitante?.nombre?.charAt(0)}</span>}
+                                      <div className="flex flex-col items-center gap-1 md:gap-3">
+                                        <div className="w-10 h-10 sm:w-16 sm:h-16 md:w-20 md:h-20 bg-gray-50 rounded-full flex items-center justify-center border-2 border-gray-100 shrink-0 overflow-hidden shadow-sm">
+                                          {partido.visitante?.logo_url ? <img src={partido.visitante.logo_url} alt={partido.visitante?.nombre} className="w-full h-full object-contain p-1" /> : <span className="text-gray-300 font-black text-lg md:text-2xl">{partido.visitante?.nombre?.charAt(0) || 'V'}</span>}
                                         </div>
-                                        <span className="font-black text-gray-900 text-[9px] md:text-[10px] text-center uppercase leading-tight">{partido.visitante?.nombre}</span>
+                                        <span className="font-bold text-gray-900 text-[9px] sm:text-sm md:text-base text-center uppercase leading-snug px-0.5">{partido.visitante?.nombre}</span>
                                       </div>
                                     </div>
                                   </>
