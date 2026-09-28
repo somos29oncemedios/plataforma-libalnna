@@ -64,7 +64,8 @@ export default function Calendario() {
     if (seccionActiva === "resultados") {
       return partido.estado === "finalizado" || partido.estado === "suspendido";
     } else {
-      return partido.estado !== "finalizado" && partido.estado !== "suspendido";
+      // Excluimos explícitamente los partidos en "borrador" de la vista pública
+      return partido.estado !== "finalizado" && partido.estado !== "suspendido" && partido.estado !== "borrador";
     }
   });
 

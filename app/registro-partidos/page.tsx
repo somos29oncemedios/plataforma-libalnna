@@ -252,20 +252,121 @@ export default function PanelEmparejamientos() {
   };
 
   const publicarCalendario = async () => {
-    const confirmar = window.confirm("¿Estás seguro de que deseas PUBLICAR todo el calendario? Los partidos en borrador pasarán a estar programados públicamente.");
+    const confirmar = window.confirm("¿Estás seguro de que deseas PUBLICAR todo el calendario? Los partidos en borrador pasarán a estar programados públicamente y se enviarán correos a los clubes involucrados.");
     if (!confirmar) return;
 
-    const { error } = await supabase
+    // 1. Obtener los borradores ANTES de actualizarlos, para poder enviarles el correo a los clubes correctos
+    // Necesitamos hacer JOIN con equipos para traer los correos
+    const { data: borradoresData, error: fetchError } = await supabase
+      .from('partidos')
+      .select(`
+        *,
+        equipo_local:equipos!equipo_local_id(nombre, correo_electronico, logo_url),
+        equipo_visitante:equipos!equipo_visitante_id(nombre, correo_electronico, logo_url)
+      `)
+      .eq('estado', 'borrador');
+
+    if (fetchError) {
+      alert(`❌ Error al recuperar borradores: ${fetchError.message}`);
+      return;
+    }
+
+    // 2. Actualizar el estado en la base de datos a "programado"
+    const { error: updateError } = await supabase
       .from('partidos')
       .update({ estado: 'programado' })
       .eq('estado', 'borrador');
 
-    if (error) {
-      alert(`❌ Error al publicar: ${error.message}`);
-    } else {
-      alert("✅ ¡Calendario Oficial Publicado con éxito!");
-      cargarDatos();
+    if (updateError) {
+      alert(`❌ Error al publicar: ${updateError.message}`);
+      return;
     }
+
+    // 3. Si todo salió bien y había partidos, disparar los correos
+    if (borradoresData && borradoresData.length > 0) {
+      try {
+        const response = await fetch('/api/notificar-partidos', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ partidos: borradoresData }),
+        });
+        
+        const responseData = await response.json();
+        
+        if (!response.ok) {
+          alert(`⚠️ Alerta de Correos: La API respondió con error ${response.status}: ${JSON.stringify(responseData)}`);
+        } else {
+          alert("✅ ¡Calendario Oficial Publicado con éxito! Se han enviado notificaciones por correo a los clubes.");
+        }
+      } catch (err: any) {
+        alert(`❌ Error técnico crítico al conectar con la API de correos: ${err.message}`);
+        console.error("Error técnico al enviar correos:", err);
+      }
+    } else {
+      alert("✅ ¡Calendario Oficial Publicado con éxito! (No había partidos para notificar).");
+    }
+
+    cargarDatos();
+  };
+
+  const publicarPartidoIndividual = async (partidoId: number) => {
+    const confirmar = window.confirm("¿Estás seguro de que deseas PUBLICAR este partido? Pasará a estar programado públicamente y se enviará un correo a los clubes involucrados.");
+    if (!confirmar) return;
+
+    // 1. Obtener los datos del partido con los correos de los equipos
+    const { data: partidoData, error: fetchError } = await supabase
+      .from('partidos')
+      .select(`
+        *,
+        equipo_local:equipos!equipo_local_id(nombre, correo_electronico, logo_url),
+        equipo_visitante:equipos!equipo_visitante_id(nombre, correo_electronico, logo_url)
+      `)
+      .eq('id', partidoId)
+      .single();
+
+    if (fetchError) {
+      alert(`❌ Error al recuperar el partido: ${fetchError.message}`);
+      return;
+    }
+
+    // 2. Actualizar el estado en la base de datos a "programado"
+    const { error: updateError } = await supabase
+      .from('partidos')
+      .update({ estado: 'programado' })
+      .eq('id', partidoId);
+
+    if (updateError) {
+      alert(`❌ Error al publicar: ${updateError.message}`);
+      return;
+    }
+
+    // 3. Si todo salió bien, disparar el correo individualmente
+    if (partidoData) {
+      try {
+        const response = await fetch('/api/notificar-partidos', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ partidos: [partidoData] }),
+        });
+        
+        const responseData = await response.json();
+        
+        if (!response.ok) {
+          alert(`⚠️ Alerta de Correos: La API respondió con error ${response.status}: ${JSON.stringify(responseData)}`);
+        } else {
+          alert("✅ ¡Partido Publicado con éxito! Se han enviado notificaciones por correo a los clubes.");
+        }
+      } catch (err: any) {
+        alert(`❌ Error técnico crítico al conectar con la API de correos: ${err.message}`);
+        console.error("Error técnico al enviar correos:", err);
+      }
+    }
+
+    cargarDatos();
   };
 
   // 🏀 FUNCIONES DE ACCIÓN: EDITAR Y ELIMINAR PARTIDOS EXISTENTES
@@ -599,6 +700,15 @@ export default function PanelEmparejamientos() {
                                             >
                                               ✏️
                                             </button>
+                                            {partido.estado === 'borrador' && (
+                                              <button 
+                                                onClick={() => publicarPartidoIndividual(partido.id)}
+                                                className="text-gray-400 hover:text-green-600 bg-white hover:bg-green-50 p-1 md:p-1.5 rounded-md transition-colors border border-gray-200 shadow-sm"
+                                                title="Publicar partido individualmente"
+                                              >
+                                                🚀
+                                              </button>
+                                            )}
                                             <button 
                                               onClick={() => eliminarPartido(partido.id)}
                                               className="text-gray-400 hover:text-red-600 bg-white hover:bg-red-50 p-1 md:p-1.5 rounded-md transition-colors border border-gray-200 shadow-sm"

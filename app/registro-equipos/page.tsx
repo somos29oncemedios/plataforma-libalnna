@@ -11,6 +11,7 @@ const CATEGORIAS_DISPONIBLES = [
 export default function RegistroEquipos() {
   const [equipos, setEquipos] = useState<any[]>([]);
   const [nombre, setNombre] = useState('');
+  const [correoElectronico, setCorreoElectronico] = useState(''); // NUEVO: Estado para correo electrónico
   const [logoUrl, setLogoUrl] = useState('');
   
   // 🚀 NUEVO: Estado para manejar el archivo físico de la imagen
@@ -82,6 +83,7 @@ export default function RegistroEquipos() {
 
     const datosEquipo = { 
       nombre, 
+      correo_electronico: correoElectronico, // NUEVO: Guardamos el correo
       logo_url: urlFinal, // Guardamos la URL final (vieja o nueva)
       categorias: categoriasSeleccionadas 
     };
@@ -112,6 +114,7 @@ export default function RegistroEquipos() {
 
   const editarEquipo = (equipo: any) => {
     setNombre(equipo.nombre);
+    setCorreoElectronico(equipo.correo_electronico || ''); // Cargar el correo existente
     setLogoUrl(equipo.logo_url || '');
     setArchivoLogo(null); // Limpiamos el archivo si había algo cargado en el input
     setCategoriasSeleccionadas(equipo.categorias || []);
@@ -142,6 +145,7 @@ export default function RegistroEquipos() {
 
   const limpiarFormulario = () => {
     setNombre('');
+    setCorreoElectronico('');
     setLogoUrl('');
     setArchivoLogo(null);
     setCategoriasSeleccionadas([]);
@@ -167,9 +171,15 @@ export default function RegistroEquipos() {
         </h2>
 
         <form onSubmit={guardarEquipo} className="flex flex-col gap-6">
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">Nombre del Equipo *</label>
-            <input type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej. Guerreros BBC" className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">Nombre del Equipo *</label>
+              <input type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej. Guerreros BBC" className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">Correo Electrónico (Notificaciones)</label>
+              <input type="email" value={correoElectronico} onChange={(e) => setCorreoElectronico(e.target.value)} placeholder="ejemplo@club.com" className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
           </div>
 
           <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
@@ -248,6 +258,7 @@ export default function RegistroEquipos() {
                   </div>
                   <div>
                     <p className="text-lg font-black text-gray-900">{equipo.nombre}</p>
+                    <p className="text-sm font-semibold text-gray-600">{equipo.correo_electronico || 'Sin correo registrado'}</p>
                     <p className="text-xs font-bold text-blue-600 mt-1">Categorías: {equipo.categorias?.join(', ') || 'Ninguna'}</p>
                   </div>
                 </div>
