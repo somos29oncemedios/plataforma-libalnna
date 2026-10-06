@@ -424,13 +424,23 @@ export default function PanelEmparejamientos() {
 
   return (
     <main className="container mx-auto px-4 py-12 max-w-6xl">
-      <div className="text-center mb-6">
-        <h1 className="text-3xl md:text-4xl font-black text-gray-900 uppercase tracking-tight">
-          Generador de Temporada Regular
-        </h1>
-        <p className="text-gray-500 font-bold mt-2">
-          Programa los cruces automáticos de la liga.
-        </p>
+      <div className="flex flex-col md:flex-row justify-between items-center mb-6">
+        <div className="text-center md:text-left">
+          <h1 className="text-3xl md:text-4xl font-black text-gray-900 uppercase tracking-tight">
+            Generador de Temporada Regular
+          </h1>
+          <p className="text-gray-500 font-bold mt-2">
+            Programa los cruces automáticos de la liga.
+          </p>
+        </div>
+        <div className="mt-4 md:mt-0">
+          <a 
+            href="/registro-partidos/generador" 
+            className="inline-flex items-center gap-2 bg-gradient-to-r from-pink-500 to-orange-500 hover:from-pink-600 hover:to-orange-600 text-white font-black px-6 py-3 rounded-xl shadow-lg transition-transform hover:scale-105"
+          >
+            📸 Crear Gráfica de Instagram
+          </a>
+        </div>
       </div>
 
       {/* PANEL GLOBAL DE LA LIGA */}
