@@ -125,6 +125,15 @@ export default function PanelDeControl() {
             </div>
           </Link>
 
+          {/* Generador de Gráficas */}
+          <Link href="/registro-partidos/generador" className="bg-white border-2 border-gray-200 rounded-2xl p-8 hover:border-pink-500 hover:shadow-xl transition-all group flex items-center gap-6">
+            <div className="w-16 h-16 bg-pink-100 text-pink-600 rounded-full flex items-center justify-center text-3xl group-hover:bg-pink-600 group-hover:text-white transition-colors">📸</div>
+            <div>
+              <h2 className="text-2xl font-black text-gray-900 uppercase">Gráficas IG</h2>
+              <p className="text-gray-500 font-medium">Exportar calendarios para Instagram.</p>
+            </div>
+          </Link>
+
         </div>
       ) : (
         /* Vista exclusiva para el programador si por alguna razón no alcanzó a redirigir */
