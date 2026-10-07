@@ -246,7 +246,7 @@ export default function GeneradorGraficas() {
                       <div className="flex items-center gap-4 w-[40%] h-full">
                         <div className="w-[145px] h-[145px] -ml-[30px] shrink-0 bg-white rounded-full p-2 shadow-sm flex items-center justify-center">
                           {p.local?.logo_url ? (
-                            <img src={p.local.logo_url} alt={p.local.nombre} className="w-full h-full object-contain" />
+                            <img src={`${p.local.logo_url}?t=${Date.now()}`} crossOrigin="anonymous" alt={p.local.nombre} className="w-full h-full object-contain" />
                           ) : (
                             <div className="w-full h-full bg-gray-100 rounded-full flex items-center justify-center text-gray-400 font-black text-4xl">L</div>
                           )}
@@ -266,7 +266,7 @@ export default function GeneradorGraficas() {
                         <span className="text-[#0E6CA8] font-black text-[26px] leading-tight uppercase line-clamp-2 pl-2">{p.visitante?.nombre || 'Visitante'}</span>
                         <div className="w-[145px] h-[145px] -mr-[30px] shrink-0 bg-white rounded-full p-2 shadow-sm flex items-center justify-center">
                           {p.visitante?.logo_url ? (
-                            <img src={p.visitante.logo_url} alt={p.visitante.nombre} className="w-full h-full object-contain" />
+                            <img src={`${p.visitante.logo_url}?t=${Date.now()}`} crossOrigin="anonymous" alt={p.visitante.nombre} className="w-full h-full object-contain" />
                           ) : (
                             <div className="w-full h-full bg-gray-100 rounded-full flex items-center justify-center text-gray-400 font-black text-4xl">V</div>
                           )}
