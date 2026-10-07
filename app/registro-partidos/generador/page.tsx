@@ -246,7 +246,17 @@ export default function GeneradorGraficas() {
                       <div className="flex items-center gap-4 w-[40%] h-full">
                         <div className="w-[145px] h-[145px] -ml-[30px] shrink-0 bg-white rounded-full p-2 shadow-sm flex items-center justify-center">
                           {p.local?.logo_url ? (
-                            <img src={`${p.local.logo_url}?t=${Date.now()}`} crossOrigin="anonymous" alt={p.local.nombre} className="w-full h-full object-contain" />
+                            <img 
+                              src={`${p.local.logo_url}?t=${Date.now()}`} 
+                              crossOrigin="anonymous" 
+                              alt={p.local.nombre} 
+                              className="w-full h-full object-contain"
+                              onError={(e) => {
+                                // Si la imagen está rota, se reemplaza por un cuadro gris con la letra inicial
+                                const target = e.target as HTMLImageElement;
+                                target.src = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="%23f3f4f6"/><text x="50" y="68" font-family="Arial" font-size="50" font-weight="bold" fill="%239ca3af" text-anchor="middle">L</text></svg>`;
+                              }}
+                            />
                           ) : (
                             <div className="w-full h-full bg-gray-100 rounded-full flex items-center justify-center text-gray-400 font-black text-4xl">L</div>
                           )}
@@ -256,7 +266,7 @@ export default function GeneradorGraficas() {
                       
                       {/* CATEGORÍA EN EL CENTRO */}
                       <div className="flex flex-col items-center justify-center shrink-0 w-[20%]">
-                        <span className={`text-black font-black ${isLongCat ? 'text-[45px] -mt-2' : 'text-[65px]'} leading-none tracking-wide`} style={{ fontFamily: '"Impact", sans-serif' }}>
+                        <span className={`text-black font-black whitespace-nowrap ${isLongCat ? 'text-[36px] -mt-2' : 'text-[65px]'} leading-none tracking-wide`} style={{ fontFamily: '"Impact", sans-serif' }}>
                           <span className="text-[#E91B58]">{catCorta.charAt(0)}</span>{catCorta.slice(1)}
                         </span>
                       </div>
@@ -266,7 +276,16 @@ export default function GeneradorGraficas() {
                         <span className="text-[#0E6CA8] font-black text-[26px] leading-tight uppercase line-clamp-2 pl-2">{p.visitante?.nombre || 'Visitante'}</span>
                         <div className="w-[145px] h-[145px] -mr-[30px] shrink-0 bg-white rounded-full p-2 shadow-sm flex items-center justify-center">
                           {p.visitante?.logo_url ? (
-                            <img src={`${p.visitante.logo_url}?t=${Date.now()}`} crossOrigin="anonymous" alt={p.visitante.nombre} className="w-full h-full object-contain" />
+                            <img 
+                              src={`${p.visitante.logo_url}?t=${Date.now()}`} 
+                              crossOrigin="anonymous" 
+                              alt={p.visitante.nombre} 
+                              className="w-full h-full object-contain"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.src = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="%23f3f4f6"/><text x="50" y="68" font-family="Arial" font-size="50" font-weight="bold" fill="%239ca3af" text-anchor="middle">V</text></svg>`;
+                              }}
+                            />
                           ) : (
                             <div className="w-full h-full bg-gray-100 rounded-full flex items-center justify-center text-gray-400 font-black text-4xl">V</div>
                           )}
