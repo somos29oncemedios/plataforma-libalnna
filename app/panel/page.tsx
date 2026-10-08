@@ -134,6 +134,15 @@ export default function PanelDeControl() {
             </div>
           </Link>
 
+          {/* Gestión de Usuarios */}
+          <Link href="/panel/usuarios" className="bg-white border-2 border-gray-200 rounded-2xl p-8 hover:border-purple-500 hover:shadow-xl transition-all group flex items-center gap-6">
+            <div className="w-16 h-16 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center text-3xl group-hover:bg-purple-600 group-hover:text-white transition-colors">👥</div>
+            <div>
+              <h2 className="text-2xl font-black text-gray-900 uppercase">Usuarios</h2>
+              <p className="text-gray-500 font-medium">Gestionar accesos y crear cuentas.</p>
+            </div>
+          </Link>
+
         </div>
       ) : (
         /* Vista exclusiva para el programador si por alguna razón no alcanzó a redirigir */
