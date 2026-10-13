@@ -21,6 +21,11 @@ export default function PanelEmparejamientos() {
   const [partidoEditando, setPartidoEditando] = useState<string | null>(null);
   const [datosEdicion, setDatosEdicion] = useState<{fecha: string, hora: string, lugar: string}>({fecha: '', hora: '', lugar: ''});
 
+  // Estados para RESOLUCIÓN DISCIPLINARIA / SANCIÓN EN MESA
+  const [partidoSancion, setPartidoSancion] = useState<any | null>(null);
+  const [tipoSancionSeleccionada, setTipoSancionSeleccionada] = useState<'mesa_local' | 'mesa_visitante' | 'forfeit_local' | 'forfeit_visitante' | 'doble_forfeit' | 'normal'>('mesa_local');
+  const [motivoSancionTexto, setMotivoSancionTexto] = useState('');
+
   const cargarDatos = async () => {
     setCargando(true);
     
@@ -422,6 +427,57 @@ export default function PanelEmparejamientos() {
     }
   };
 
+  const abrirModalSancion = (partido: any) => {
+    setPartidoSancion(partido);
+    const tipoActual = partido.tipo_cierre || 'mesa_local';
+    setTipoSancionSeleccionada(tipoActual === 'normal' ? 'mesa_local' : tipoActual);
+    setMotivoSancionTexto(partido.motivo_sancion || '');
+  };
+
+  const aplicarSancion = async () => {
+    if (!partidoSancion) return;
+
+    let pL = partidoSancion.puntos_local || 0;
+    let pV = partidoSancion.puntos_visitante || 0;
+
+    if (tipoSancionSeleccionada === 'mesa_local' || tipoSancionSeleccionada === 'forfeit_local') {
+      pL = 0;
+      pV = 20;
+    } else if (tipoSancionSeleccionada === 'mesa_visitante' || tipoSancionSeleccionada === 'forfeit_visitante') {
+      pL = 20;
+      pV = 0;
+    } else if (tipoSancionSeleccionada === 'doble_forfeit') {
+      pL = 0;
+      pV = 0;
+    }
+
+    const payload: any = {
+      puntos_local: pL,
+      puntos_visitante: pV,
+      score_manual_local: pL,
+      score_manual_visitante: pV,
+      tipo_cierre: tipoSancionSeleccionada,
+      motivo_sancion: motivoSancionTexto.trim()
+    };
+
+    let { error } = await supabase.from('partidos').update(payload).eq('id', partidoSancion.id);
+
+    if (error && error.message && error.message.includes('column')) {
+      delete payload.tipo_cierre;
+      delete payload.motivo_sancion;
+      const res = await supabase.from('partidos').update(payload).eq('id', partidoSancion.id);
+      error = res.error;
+    }
+
+    if (error) {
+      alert(`❌ Error al aplicar resolución: ${error.message}`);
+    } else {
+      alert("✅ ¡Resolución disciplinaria aplicada correctamente!");
+      setPartidoSancion(null);
+      cargarDatos();
+    }
+  };
+
   return (
     <main className="container mx-auto px-4 py-12 max-w-6xl">
       <div className="flex flex-col md:flex-row justify-between items-center mb-6">
@@ -794,7 +850,17 @@ export default function PanelEmparejamientos() {
                               <div key={partido.id} className="bg-gray-100 border border-gray-300 rounded-xl p-4 flex flex-col gap-3">
                                 <div className="flex justify-between items-center border-b border-gray-300 pb-2">
                                   <span className="font-bold text-[10px] bg-gray-200 text-gray-700 px-2 py-0.5 rounded">{formatearHora(partido.hora)}</span>
-                                  <span className="font-black text-[9px] bg-green-200 text-green-900 px-2 py-0.5 rounded uppercase">Finalizado</span>
+                                  {partido.tipo_cierre === 'forfeit_local' || partido.tipo_cierre === 'forfeit_visitante' ? (
+                                    <span className="font-black text-[9px] bg-red-200 text-red-900 px-2 py-0.5 rounded uppercase">W.O. / Forfeit</span>
+                                  ) : partido.tipo_cierre === 'doble_forfeit' ? (
+                                    <span className="font-black text-[9px] bg-red-300 text-red-950 px-2 py-0.5 rounded uppercase">Doble Forfeit</span>
+                                  ) : partido.tipo_cierre === 'default_local' || partido.tipo_cierre === 'default_visitante' ? (
+                                    <span className="font-black text-[9px] bg-amber-200 text-amber-900 px-2 py-0.5 rounded uppercase">Default</span>
+                                  ) : partido.tipo_cierre === 'mesa_local' || partido.tipo_cierre === 'mesa_visitante' ? (
+                                    <span className="font-black text-[9px] bg-purple-200 text-purple-900 px-2 py-0.5 rounded uppercase">Mesa ⚖️</span>
+                                  ) : (
+                                    <span className="font-black text-[9px] bg-green-200 text-green-900 px-2 py-0.5 rounded uppercase">Finalizado</span>
+                                  )}
                                 </div>
                                 
                                 <div className="flex justify-between items-center px-1 mt-2">
@@ -816,6 +882,23 @@ export default function PanelEmparejamientos() {
                                     <span className="text-xl font-black text-gray-900 mt-1 bg-white px-3 py-0.5 rounded-md border border-gray-200">{partido.puntos_visitante}</span>
                                   </div>
                                 </div>
+
+                                <div className="mt-2 pt-2 border-t border-gray-300 flex justify-between items-center">
+                                  {partido.motivo_sancion ? (
+                                    <span className="text-[8px] text-gray-600 truncate max-w-[65%]" title={partido.motivo_sancion}>
+                                      ⚖️ {partido.motivo_sancion}
+                                    </span>
+                                  ) : (
+                                    <span className="text-[8px] text-gray-400">Regular</span>
+                                  )}
+                                  <button 
+                                    onClick={() => abrirModalSancion(partido)}
+                                    className="bg-purple-600 hover:bg-purple-700 text-white font-black text-[9px] px-2 py-1 rounded shadow-sm transition-colors uppercase flex items-center gap-1"
+                                    title="Aplicar resolución disciplinaria o sanción"
+                                  >
+                                    ⚖️ Sanción
+                                  </button>
+                                </div>
                               </div>
                             ))}
                           </div>
@@ -828,6 +911,187 @@ export default function PanelEmparejamientos() {
             </div>
           )}
 
+        </div>
+      )}
+
+      {/* ⚖️ MODAL DE RESOLUCIÓN DISCIPLINARIA / SANCIÓN EN MESA */}
+      {partidoSancion && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl border-4 border-purple-200 flex flex-col max-h-[90vh] overflow-y-auto">
+            
+            <div className="flex justify-between items-center border-b pb-3 mb-4">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">⚖️</span>
+                <h3 className="font-black text-lg uppercase text-gray-900 tracking-tight">Resolución Disciplinaria / Mesa</h3>
+              </div>
+              <button onClick={() => setPartidoSancion(null)} className="w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center font-black text-gray-700">✕</button>
+            </div>
+
+            <div className="bg-gray-50 border border-gray-200 p-3 rounded-xl mb-4 text-center">
+              <div className="text-xs font-bold text-gray-500 uppercase">{partidoSancion.categoria} - {partidoSancion.fase_torneo}</div>
+              <div className="font-black text-sm uppercase text-gray-900 mt-1">
+                {partidoSancion.local?.nombre} <span className="text-blue-600 font-bold">({partidoSancion.puntos_local})</span>
+                <span className="text-gray-400 mx-2">vs</span>
+                <span className="text-blue-600 font-bold">({partidoSancion.puntos_visitante})</span> {partidoSancion.visitante?.nombre}
+              </div>
+            </div>
+
+            <p className="text-xs text-gray-700 font-bold mb-3 uppercase tracking-wide">
+              Selecciona la medida reglamentaria:
+            </p>
+
+            <div className="flex flex-col gap-2.5 mb-4">
+              
+              {/* Mesa Local sancionado */}
+              <label className={`p-3 rounded-xl border-2 flex items-start gap-3 cursor-pointer transition-all ${tipoSancionSeleccionada === 'mesa_local' ? 'border-purple-600 bg-purple-50 shadow-sm' : 'border-gray-200 hover:border-gray-300'}`}>
+                <input 
+                  type="radio" 
+                  name="tipoSancion" 
+                  value="mesa_local" 
+                  checked={tipoSancionSeleccionada === 'mesa_local'} 
+                  onChange={() => setTipoSancionSeleccionada('mesa_local')} 
+                  className="mt-1"
+                />
+                <div>
+                  <div className="font-black text-xs uppercase text-gray-900">
+                    Pérdida en mesa: {partidoSancion.local?.nombre} sancionado
+                  </div>
+                  <div className="text-[11px] text-gray-500 font-medium">
+                    Marcador ajustado a <strong>0 - 20</strong> a favor de {partidoSancion.visitante?.nombre}. El local recibe <strong>0 puntos</strong> en la tabla.
+                  </div>
+                </div>
+              </label>
+
+              {/* Mesa Visitante sancionado */}
+              <label className={`p-3 rounded-xl border-2 flex items-start gap-3 cursor-pointer transition-all ${tipoSancionSeleccionada === 'mesa_visitante' ? 'border-purple-600 bg-purple-50 shadow-sm' : 'border-gray-200 hover:border-gray-300'}`}>
+                <input 
+                  type="radio" 
+                  name="tipoSancion" 
+                  value="mesa_visitante" 
+                  checked={tipoSancionSeleccionada === 'mesa_visitante'} 
+                  onChange={() => setTipoSancionSeleccionada('mesa_visitante')} 
+                  className="mt-1"
+                />
+                <div>
+                  <div className="font-black text-xs uppercase text-gray-900">
+                    Pérdida en mesa: {partidoSancion.visitante?.nombre} sancionado
+                  </div>
+                  <div className="text-[11px] text-gray-500 font-medium">
+                    Marcador ajustado a <strong>20 - 0</strong> a favor de {partidoSancion.local?.nombre}. El visitante recibe <strong>0 puntos</strong> en la tabla.
+                  </div>
+                </div>
+              </label>
+
+              {/* Forfeit Extemporáneo Visitante */}
+              <label className={`p-3 rounded-xl border-2 flex items-start gap-3 cursor-pointer transition-all ${tipoSancionSeleccionada === 'forfeit_visitante' ? 'border-red-600 bg-red-50 shadow-sm' : 'border-gray-200 hover:border-gray-300'}`}>
+                <input 
+                  type="radio" 
+                  name="tipoSancion" 
+                  value="forfeit_visitante" 
+                  checked={tipoSancionSeleccionada === 'forfeit_visitante'} 
+                  onChange={() => setTipoSancionSeleccionada('forfeit_visitante')} 
+                  className="mt-1"
+                />
+                <div>
+                  <div className="font-black text-xs uppercase text-gray-900">
+                    Forfeit: {partidoSancion.visitante?.nombre} (20 - 0)
+                  </div>
+                  <div className="text-[11px] text-gray-500 font-medium">
+                    Incomparecencia. Visitante recibe 0 pts en la tabla.
+                  </div>
+                </div>
+              </label>
+
+              {/* Forfeit Extemporáneo Local */}
+              <label className={`p-3 rounded-xl border-2 flex items-start gap-3 cursor-pointer transition-all ${tipoSancionSeleccionada === 'forfeit_local' ? 'border-red-600 bg-red-50 shadow-sm' : 'border-gray-200 hover:border-gray-300'}`}>
+                <input 
+                  type="radio" 
+                  name="tipoSancion" 
+                  value="forfeit_local" 
+                  checked={tipoSancionSeleccionada === 'forfeit_local'} 
+                  onChange={() => setTipoSancionSeleccionada('forfeit_local')} 
+                  className="mt-1"
+                />
+                <div>
+                  <div className="font-black text-xs uppercase text-gray-900">
+                    Forfeit: {partidoSancion.local?.nombre} (0 - 20)
+                  </div>
+                  <div className="text-[11px] text-gray-500 font-medium">
+                    Incomparecencia. Local recibe 0 pts en la tabla.
+                  </div>
+                </div>
+              </label>
+
+              {/* Doble Forfeit */}
+              <label className={`p-3 rounded-xl border-2 flex items-start gap-3 cursor-pointer transition-all ${tipoSancionSeleccionada === 'doble_forfeit' ? 'border-red-800 bg-red-50 shadow-sm' : 'border-gray-200 hover:border-gray-300'}`}>
+                <input 
+                  type="radio" 
+                  name="tipoSancion" 
+                  value="doble_forfeit" 
+                  checked={tipoSancionSeleccionada === 'doble_forfeit'} 
+                  onChange={() => setTipoSancionSeleccionada('doble_forfeit')} 
+                  className="mt-1"
+                />
+                <div>
+                  <div className="font-black text-xs uppercase text-gray-900">
+                    Doble Forfeit (0 - 0)
+                  </div>
+                  <div className="text-[11px] text-gray-500 font-medium">
+                    Incomparecencia mutua. Ambos reciben 0 pts en la tabla.
+                  </div>
+                </div>
+              </label>
+
+              {/* Restaurar Partido Normal */}
+              <label className={`p-3 rounded-xl border-2 flex items-start gap-3 cursor-pointer transition-all ${tipoSancionSeleccionada === 'normal' ? 'border-green-600 bg-green-50 shadow-sm' : 'border-gray-200 hover:border-gray-300'}`}>
+                <input 
+                  type="radio" 
+                  name="tipoSancion" 
+                  value="normal" 
+                  checked={tipoSancionSeleccionada === 'normal'} 
+                  onChange={() => setTipoSancionSeleccionada('normal')} 
+                  className="mt-1"
+                />
+                <div>
+                  <div className="font-black text-xs uppercase text-green-900">
+                    Restaurar / Quitar Sanción (Resultado Deportivo)
+                  </div>
+                  <div className="text-[11px] text-gray-500 font-medium">
+                    Elimina la sanción y computa los puntos habituales de victoria/derrota.
+                  </div>
+                </div>
+              </label>
+
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
+                Motivo / Justificación de la Resolución:
+              </label>
+              <textarea 
+                value={motivoSancionTexto}
+                onChange={(e) => setMotivoSancionTexto(e.target.value)}
+                placeholder="Ej: Alineación indebida de jugador sin ficha #10. Decisión emitida por la Comisión Técnica."
+                className="w-full border-2 border-gray-200 rounded-xl p-2.5 text-xs font-medium focus:border-purple-500 outline-none resize-none h-20"
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <button 
+                onClick={() => setPartidoSancion(null)}
+                className="w-1/3 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-black py-3 rounded-xl uppercase transition-colors"
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={aplicarSancion}
+                className="w-2/3 bg-purple-700 hover:bg-purple-800 text-white text-xs font-black py-3 rounded-xl uppercase tracking-wider transition-colors shadow-lg"
+              >
+                Aplicar Resolución ⚖️
+              </button>
+            </div>
+
+          </div>
         </div>
       )}
     </main>

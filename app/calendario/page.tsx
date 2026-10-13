@@ -17,7 +17,7 @@ export default function Calendario() {
       const { data, error } = await supabase
         .from('partidos')
         .select(`
-          id, fecha, hora, estado, fase_torneo, lugar, categoria, puntos_local, puntos_visitante,
+          *,
           local:equipos!equipo_local_id(nombre, logo_url),
           visitante:equipos!equipo_visitante_id(nombre, logo_url)
         `)
@@ -210,7 +210,30 @@ export default function Calendario() {
                                   <span className="text-gray-300 font-black text-sm md:text-2xl">-</span>
                                   <span className="text-xl sm:text-3xl md:text-5xl font-black text-gray-900 tracking-tighter">{partido.puntos_visitante ?? 0}</span>
                                 </div>
-                                <span className="mt-1 md:mt-2 text-[7px] md:text-xs font-bold text-gray-400 bg-gray-50 px-1.5 py-0.5 md:px-3 md:py-1 rounded-full border border-gray-100 text-center leading-none">FINALIZADO</span>
+                                {partido.tipo_cierre === 'forfeit_local' || partido.tipo_cierre === 'forfeit_visitante' ? (
+                                  <span className="mt-1 md:mt-2 text-[7px] md:text-xs font-black text-red-700 bg-red-100 px-2 py-0.5 md:px-3 md:py-1 rounded-full border border-red-300 text-center leading-none shadow-sm">
+                                    W.O. / FORFEIT
+                                  </span>
+                                ) : partido.tipo_cierre === 'doble_forfeit' ? (
+                                  <span className="mt-1 md:mt-2 text-[7px] md:text-xs font-black text-red-900 bg-red-200 px-2 py-0.5 md:px-3 md:py-1 rounded-full border border-red-400 text-center leading-none shadow-sm">
+                                    DOBLE FORFEIT
+                                  </span>
+                                ) : partido.tipo_cierre === 'default_local' || partido.tipo_cierre === 'default_visitante' ? (
+                                  <span className="mt-1 md:mt-2 text-[7px] md:text-xs font-black text-amber-800 bg-amber-100 px-2 py-0.5 md:px-3 md:py-1 rounded-full border border-amber-300 text-center leading-none shadow-sm">
+                                    DEFAULT (INFERIORIDAD)
+                                  </span>
+                                ) : partido.tipo_cierre === 'mesa_local' || partido.tipo_cierre === 'mesa_visitante' ? (
+                                  <span 
+                                    className="mt-1 md:mt-2 text-[7px] md:text-xs font-black text-purple-800 bg-purple-100 px-2 py-0.5 md:px-3 md:py-1 rounded-full border border-purple-300 text-center leading-none shadow-sm cursor-help"
+                                    title={partido.motivo_sancion ? `Motivo: ${partido.motivo_sancion}` : 'Resolución administrativa'}
+                                  >
+                                    RESOLUCIÓN DE MESA ⚖️
+                                  </span>
+                                ) : (
+                                  <span className="mt-1 md:mt-2 text-[7px] md:text-xs font-bold text-gray-400 bg-gray-50 px-1.5 py-0.5 md:px-3 md:py-1 rounded-full border border-gray-100 text-center leading-none">
+                                    FINALIZADO
+                                  </span>
+                                )}
                               </>
                             ) : partido.estado === "suspendido" ? (
                               <>

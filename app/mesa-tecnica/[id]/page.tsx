@@ -29,6 +29,11 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
   // 🏀 ESTADO PARA MODAL DE BANCA
   const [modalBanca, setModalBanca] = useState<'local' | 'visitante' | null>(null);
 
+  // 🏀 ESTADOS PARA INCIDENCIA ESPECIAL (FORFEIT / DEFAULT FIBA)
+  const [modalIncidencia, setModalIncidencia] = useState(false);
+  const [tipoIncidencia, setTipoIncidencia] = useState<'forfeit_visitante' | 'forfeit_local' | 'doble_forfeit' | 'default_visitante' | 'default_local'>('forfeit_visitante');
+  const [motivoIncidencia, setMotivoIncidencia] = useState('');
+
   // 🏀 ESTADOS PARA LA MEMORIA MUSCULAR (Acción y Operación)
   const [accionPendiente, setAccionPendiente] = useState<'tl' | 'd2' | 't3' | null>(null);
   const [modoOperacion, setModoOperacion] = useState<'sumar' | 'restar'>('sumar');
@@ -205,6 +210,89 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
     }
   };
 
+  const confirmarIncidencia = async () => {
+    let ptsL = 0;
+    let ptsV = 0;
+    let desc = "";
+
+    if (tipoIncidencia === 'forfeit_visitante') {
+      // Visitante no se presentó -> Local gana 20 - 0
+      ptsL = 20;
+      ptsV = 0;
+      desc = `Forfeit: ${partido?.visitante?.nombre} no se presentó. Marcador 20 - 0 a favor de ${partido?.local?.nombre}. (Visitante recibe 0 pts en la tabla)`;
+    } else if (tipoIncidencia === 'forfeit_local') {
+      // Local no se presentó -> Visitante gana 0 - 20
+      ptsL = 0;
+      ptsV = 20;
+      desc = `Forfeit: ${partido?.local?.nombre} no se presentó. Marcador 0 - 20 a favor de ${partido?.visitante?.nombre}. (Local recibe 0 pts en la tabla)`;
+    } else if (tipoIncidencia === 'doble_forfeit') {
+      // Ninguno se presentó -> 0 - 0
+      ptsL = 0;
+      ptsV = 0;
+      desc = `Doble Forfeit: Ninguno de los dos equipos se presentó. Marcador 0 - 0. (Ambos reciben 0 pts en la tabla)`;
+    } else if (tipoIncidencia === 'default_visitante') {
+      // Visitante quedó con < 2 jugadores (Art. 21 FIBA)
+      if (scoreLocal > scoreVisitante) {
+        ptsL = scoreLocal;
+        ptsV = scoreVisitante;
+      } else {
+        ptsL = 2;
+        ptsV = 0;
+      }
+      desc = `Default: ${partido?.visitante?.nombre} quedó con inferioridad numérica (< 2 jugadores). Marcador oficial ${ptsL} - ${ptsV}.`;
+    } else if (tipoIncidencia === 'default_local') {
+      // Local quedó con < 2 jugadores
+      if (scoreVisitante > scoreLocal) {
+        ptsL = scoreLocal;
+        ptsV = scoreVisitante;
+      } else {
+        ptsL = 0;
+        ptsV = 2;
+      }
+      desc = `Default: ${partido?.local?.nombre} quedó con inferioridad numérica (< 2 jugadores). Marcador oficial ${ptsL} - ${ptsV}.`;
+    }
+
+    const confirmar = window.confirm(`⚠️ ¿Estás seguro de registrar esta incidencia y cerrar definitivamente el partido?\n\n${desc}`);
+    if (!confirmar) return;
+
+    const payload: any = {
+      estado: 'finalizado',
+      puntos_local: ptsL,
+      puntos_visitante: ptsV,
+      score_manual_local: ptsL,
+      score_manual_visitante: ptsV,
+      tipo_cierre: tipoIncidencia,
+      motivo_sancion: motivoIncidencia.trim() || desc
+    };
+
+    let { error } = await supabase.from('partidos').update(payload).eq('id', id);
+
+    // Salvavidas preventivo si aún no han ejecutado la migración de columnas en Supabase:
+    if (error && error.message && error.message.includes('column')) {
+      delete payload.tipo_cierre;
+      delete payload.motivo_sancion;
+      const fallbackRes = await supabase.from('partidos').update(payload).eq('id', id);
+      error = fallbackRes.error;
+    }
+
+    if (!error) {
+      localStorage.removeItem(`libalnna_partido_${id}`);
+      alert("✅ ¡Incidencia registrada y partido finalizado exitosamente!");
+      setPartido({
+        ...partido,
+        estado: 'finalizado',
+        puntos_local: ptsL,
+        puntos_visitante: ptsV,
+        tipo_cierre: tipoIncidencia,
+        motivo_sancion: motivoIncidencia.trim() || desc
+      });
+      setModalIncidencia(false);
+      setSeleccionInicial(false);
+    } else {
+      alert(`❌ Error técnico: ${error.message}`);
+    }
+  };
+
 
   // ----- LÓGICA DE JUEGO PRINCIPAL -----
   const partidoBloqueado = (partido?.estado === 'finalizado' || partido?.estado === 'suspendido') && !editandoDespuesDeFinalizar;
@@ -367,6 +455,160 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
   const scoreLocal = Math.max(0, scoreJugadoresLocal + (partido?.score_manual_local || 0));
   const scoreVisitante = Math.max(0, scoreJugadoresVisitante + (partido?.score_manual_visitante || 0));
 
+  const renderModalIncidencia = () => {
+    if (!modalIncidencia) return null;
+    return (
+      <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl border-4 border-red-100 flex flex-col max-h-[90vh] overflow-y-auto">
+          
+          <div className="flex justify-between items-center border-b pb-3 mb-4">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">⚠️</span>
+              <h3 className="font-black text-lg uppercase text-gray-900 tracking-tight">Incidencia Especial (Reglas FIBA)</h3>
+            </div>
+            <button onClick={() => setModalIncidencia(false)} className="w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center font-black text-gray-700">✕</button>
+          </div>
+
+          <p className="text-xs text-gray-600 font-bold mb-4">
+            Selecciona la causal del cierre oficial para este encuentro:
+          </p>
+
+          <div className="flex flex-col gap-2.5 mb-5">
+            
+            {/* Forfeit Visitante */}
+            <label className={`p-3 rounded-xl border-2 flex items-start gap-3 cursor-pointer transition-all ${tipoIncidencia === 'forfeit_visitante' ? 'border-red-600 bg-red-50/70 shadow-sm' : 'border-gray-200 hover:border-gray-300'}`}>
+              <input 
+                type="radio" 
+                name="tipoIncidencia" 
+                value="forfeit_visitante" 
+                checked={tipoIncidencia === 'forfeit_visitante'} 
+                onChange={() => setTipoIncidencia('forfeit_visitante')} 
+                className="mt-1"
+              />
+              <div>
+                <div className="font-black text-xs uppercase text-gray-900">
+                  🏃‍♂️ Forfeit: {partido?.visitante?.nombre} no se presentó
+                </div>
+                <div className="text-[11px] text-gray-500 font-medium mt-0.5">
+                  Marcador oficial <strong>20 - 0</strong> a favor de {partido?.local?.nombre}. El visitante recibe <strong>0 puntos</strong> en la tabla.
+                </div>
+              </div>
+            </label>
+
+            {/* Forfeit Local */}
+            <label className={`p-3 rounded-xl border-2 flex items-start gap-3 cursor-pointer transition-all ${tipoIncidencia === 'forfeit_local' ? 'border-red-600 bg-red-50/70 shadow-sm' : 'border-gray-200 hover:border-gray-300'}`}>
+              <input 
+                type="radio" 
+                name="tipoIncidencia" 
+                value="forfeit_local" 
+                checked={tipoIncidencia === 'forfeit_local'} 
+                onChange={() => setTipoIncidencia('forfeit_local')} 
+                className="mt-1"
+              />
+              <div>
+                <div className="font-black text-xs uppercase text-gray-900">
+                  🏃‍♂️ Forfeit: {partido?.local?.nombre} no se presentó
+                </div>
+                <div className="text-[11px] text-gray-500 font-medium mt-0.5">
+                  Marcador oficial <strong>0 - 20</strong> a favor de {partido?.visitante?.nombre}. El local recibe <strong>0 puntos</strong> en la tabla.
+                </div>
+              </div>
+            </label>
+
+            {/* Doble Forfeit */}
+            <label className={`p-3 rounded-xl border-2 flex items-start gap-3 cursor-pointer transition-all ${tipoIncidencia === 'doble_forfeit' ? 'border-red-600 bg-red-50/70 shadow-sm' : 'border-gray-200 hover:border-gray-300'}`}>
+              <input 
+                type="radio" 
+                name="tipoIncidencia" 
+                value="doble_forfeit" 
+                checked={tipoIncidencia === 'doble_forfeit'} 
+                onChange={() => setTipoIncidencia('doble_forfeit')} 
+                className="mt-1"
+              />
+              <div>
+                <div className="font-black text-xs uppercase text-gray-900">
+                  🛑 Doble Forfeit: Ninguno de los dos se presentó
+                </div>
+                <div className="text-[11px] text-gray-500 font-medium mt-0.5">
+                  Marcador oficial <strong>0 - 0</strong>. Ambos equipos reciben <strong>0 puntos</strong> en la tabla.
+                </div>
+              </div>
+            </label>
+
+            {/* Default Visitante */}
+            <label className={`p-3 rounded-xl border-2 flex items-start gap-3 cursor-pointer transition-all ${tipoIncidencia === 'default_visitante' ? 'border-amber-600 bg-amber-50/70 shadow-sm' : 'border-gray-200 hover:border-gray-300'}`}>
+              <input 
+                type="radio" 
+                name="tipoIncidencia" 
+                value="default_visitante" 
+                checked={tipoIncidencia === 'default_visitante'} 
+                onChange={() => setTipoIncidencia('default_visitante')} 
+                className="mt-1"
+              />
+              <div>
+                <div className="font-black text-xs uppercase text-gray-900">
+                  📉 Default: {partido?.visitante?.nombre} quedó con &lt; 2 jugadores
+                </div>
+                <div className="text-[11px] text-gray-500 font-medium mt-0.5">
+                  Inferioridad numérica (Art. 21 FIBA). Si el rival va ganando se mantiene marcador, si no, 2 - 0. El perdedor recibe 1 punto.
+                </div>
+              </div>
+            </label>
+
+            {/* Default Local */}
+            <label className={`p-3 rounded-xl border-2 flex items-start gap-3 cursor-pointer transition-all ${tipoIncidencia === 'default_local' ? 'border-amber-600 bg-amber-50/70 shadow-sm' : 'border-gray-200 hover:border-gray-300'}`}>
+              <input 
+                type="radio" 
+                name="tipoIncidencia" 
+                value="default_local" 
+                checked={tipoIncidencia === 'default_local'} 
+                onChange={() => setTipoIncidencia('default_local')} 
+                className="mt-1"
+              />
+              <div>
+                <div className="font-black text-xs uppercase text-gray-900">
+                  📉 Default: {partido?.local?.nombre} quedó con &lt; 2 jugadores
+                </div>
+                <div className="text-[11px] text-gray-500 font-medium mt-0.5">
+                  Inferioridad numérica (Art. 21 FIBA). Si el rival va ganando se mantiene marcador, si no, 0 - 2. El perdedor recibe 1 punto.
+                </div>
+              </div>
+            </label>
+
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
+              Observaciones / Acta de la Mesa (Opcional)
+            </label>
+            <textarea 
+              value={motivoIncidencia}
+              onChange={(e) => setMotivoIncidencia(e.target.value)}
+              placeholder="Ej: Incomparecencia tras 15 minutos oficiales de espera reglamentaria..."
+              className="w-full border-2 border-gray-200 rounded-xl p-2.5 text-xs font-medium focus:border-red-500 outline-none resize-none h-16"
+            />
+          </div>
+
+          <div className="flex gap-2">
+            <button 
+              onClick={() => setModalIncidencia(false)}
+              className="w-1/3 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-black py-3 rounded-xl uppercase transition-colors"
+            >
+              Cancelar
+            </button>
+            <button 
+              onClick={confirmarIncidencia}
+              className="w-2/3 bg-red-600 hover:bg-red-700 text-white text-xs font-black py-3 rounded-xl uppercase tracking-wider transition-colors shadow-lg"
+            >
+              Confirmar y Cerrar Partido ⚠️
+            </button>
+          </div>
+
+        </div>
+      </div>
+    );
+  };
+
   if (cargando) return <div className="text-center py-20 font-bold text-gray-500">Preparando la Mesa Técnica...</div>;
 
   // 🏀 RENDER FASE 0: PANTALLA DE SELECCIÓN INICIAL
@@ -481,6 +723,14 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
               </button>
             )}
 
+            {/* ⚠️ BOTÓN PARA DECLARAR FORFEIT DIRECTAMENTE SI UN EQUIPO NO SE PRESENTÓ */}
+            <button 
+              onClick={() => setModalIncidencia(true)} 
+              className="bg-red-600 hover:bg-red-700 text-white font-black px-6 py-2.5 rounded-xl shadow-md transition-all uppercase tracking-widest text-xs border-b-4 border-red-800 active:border-b-0 w-full md:w-auto flex items-center justify-center gap-1.5"
+            >
+              ⚠️ Declarar Forfeit / Incomparecencia
+            </button>
+
             {/* BOTÓN PARA REVERTIR PARTIDO EN CURSO DESDE LA FASE 0 */}
             {(partido?.estado === 'en curso' || partido?.estado === 'suspendido') && (
               <button 
@@ -493,6 +743,7 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
 
           </div>
         </div>
+        {renderModalIncidencia()}
       </main>
     );
   }
@@ -737,12 +988,15 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
             ▶️ Reanudar Partido
           </button>
         ) : (
-          <div className="flex gap-2 w-full justify-center">
+          <div className="flex flex-wrap gap-2 w-full justify-center">
             <button onClick={finalizarPartido} className="bg-gray-900 hover:bg-black text-white font-black px-4 py-2 rounded-xl shadow-md transition-all uppercase tracking-widest text-[10px] border-b-2 border-gray-700 active:border-b-0">
               🏁 Pitar Final
             </button>
             <button onClick={suspenderPartido} className="bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-black px-4 py-2 rounded-xl shadow-md transition-all uppercase tracking-widest text-[10px] border-b-2 border-yellow-700 active:border-b-0">
               ⏸️ Suspender
+            </button>
+            <button onClick={() => setModalIncidencia(true)} className="bg-red-600 hover:bg-red-700 text-white font-black px-4 py-2 rounded-xl shadow-md transition-all uppercase tracking-widest text-[10px] border-b-2 border-red-800 active:border-b-0 flex items-center gap-1">
+              ⚠️ Incidencia Especial
             </button>
           </div>
         )}
@@ -754,6 +1008,7 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
         )}
       </div>
 
+      {renderModalIncidencia()}
     </main>
   );
 }
