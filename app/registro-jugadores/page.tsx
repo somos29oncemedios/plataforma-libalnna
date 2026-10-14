@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabase';
+import { ordenarCategorias } from '@/lib/categorias';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -186,7 +187,7 @@ export default function RegistroJugadores() {
       numero: rol === 'jugador' ? numero : null, // Solo guardamos número si es jugador
       equipo_id: equipoId, 
       foto_url: urlFinal, 
-      categorias: categoriasSeleccionadas,
+      categorias: ordenarCategorias(categoriasSeleccionadas),
       rol // GUARDAMOS EL ROL
     };
 
@@ -290,7 +291,7 @@ export default function RegistroJugadores() {
         atleta.numero || '-',
         atleta.nombre,
         atleta.equipo?.nombre || 'Sin Equipo',
-        atleta.categorias?.join(', ') || 'N/A'
+        ordenarCategorias(atleta.categorias || []).join(', ') || 'N/A'
       ]);
 
       if (atleta.foto_url) {
@@ -520,7 +521,7 @@ export default function RegistroJugadores() {
                       )}
                     </div>
                     <p className="text-sm font-bold text-blue-600 truncate mt-1">{jugador.equipo?.nombre || 'Sin Equipo'}</p>
-                    <p className="text-xs font-semibold text-gray-500 mt-1 truncate">Cats: {jugador.categorias?.join(', ')}</p>
+                    <p className="text-xs font-semibold text-gray-500 mt-1 truncate">Cats: {ordenarCategorias(jugador.categorias || []).join(', ')}</p>
                   </div>
                 </div>
                 

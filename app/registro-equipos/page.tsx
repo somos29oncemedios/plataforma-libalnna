@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabase';
+import { ordenarCategorias } from '@/lib/categorias';
 
 const CATEGORIAS_DISPONIBLES = [
   'U8', 'U10', 'U12', 'U14', 
@@ -85,7 +86,7 @@ export default function RegistroEquipos() {
       nombre, 
       correo_electronico: correoElectronico, // NUEVO: Guardamos el correo
       logo_url: urlFinal, // Guardamos la URL final (vieja o nueva)
-      categorias: categoriasSeleccionadas 
+      categorias: ordenarCategorias(categoriasSeleccionadas) 
     };
 
     if (editandoId) {
@@ -259,7 +260,7 @@ export default function RegistroEquipos() {
                   <div>
                     <p className="text-lg font-black text-gray-900">{equipo.nombre}</p>
                     <p className="text-sm font-semibold text-gray-600">{equipo.correo_electronico || 'Sin correo registrado'}</p>
-                    <p className="text-xs font-bold text-blue-600 mt-1">Categorías: {equipo.categorias?.join(', ') || 'Ninguna'}</p>
+                    <p className="text-xs font-bold text-blue-600 mt-1">Categorías: {ordenarCategorias(equipo.categorias || []).join(', ') || 'Ninguna'}</p>
                   </div>
                 </div>
                 

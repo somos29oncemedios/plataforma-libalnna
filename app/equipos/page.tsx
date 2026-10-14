@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense, useMemo } from "react";
 import { useSearchParams } from 'next/navigation';
 import { supabase } from "../supabase";
+import { compararCategorias, ordenarCategorias } from "@/lib/categorias";
 
 function ListaEquipos() {
   const searchParams = useSearchParams();
@@ -26,7 +27,11 @@ function ListaEquipos() {
         .order('nombre', { ascending: true });
       
       if (eqData && eqData.length > 0) {
-        setEquipos(eqData);
+        const eqDataOrdenados = eqData.map((eq: any) => ({
+          ...eq,
+          categorias: ordenarCategorias(eq.categorias || [])
+        }));
+        setEquipos(eqDataOrdenados);
         
         const { data: jugData } = await supabase
           .from('jugadores')
@@ -92,7 +97,8 @@ function ListaEquipos() {
         cats.add(jugador.categoria);
       }
     });
-    return ["Todas", ...Array.from(cats)].sort(); 
+    const listaOrdenada = Array.from(cats).sort(compararCategorias);
+    return ["Todas", ...listaOrdenada];
   }, [rosterCompletoEquipo]);
 
   const rosterFiltrado = useMemo(() => {
@@ -154,7 +160,7 @@ function ListaEquipos() {
             </div>
             <div className="text-center md:text-left text-white flex-1">
               <h2 className="text-2xl md:text-3xl font-black uppercase tracking-wide">{equipoActivo?.nombre}</h2>
-              <p className="text-blue-400 font-semibold text-sm md:text-base mt-1">Categorías Registradas: {equipoActivo?.categorias?.join(', ') || 'General'}</p>
+              <p className="text-blue-400 font-semibold text-sm md:text-base mt-1">Categorías Registradas: {ordenarCategorias(equipoActivo?.categorias || []).join(', ') || 'General'}</p>
             </div>
           </div>
 
