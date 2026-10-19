@@ -10,6 +10,9 @@ export default function TablaPosiciones() {
   const [posiciones, setPosiciones] = useState<any[]>([]);
   const [cargando, setCargando] = useState(true);
 
+  const limiteClasificados = obtenerLimiteClasificados(categoriaActiva);
+  const nombreFase = obtenerNombreFaseClasificacion(categoriaActiva);
+
   // Estados para el modal de historial y resultados del equipo
   const [equipoModal, setEquipoModal] = useState<any | null>(null);
   const [partidosEquipo, setPartidosEquipo] = useState<any[]>([]);
@@ -213,39 +216,8 @@ export default function TablaPosiciones() {
           </button>
         ))}
       </div>
-      {/* Fin Selector de Categorías */}
-
-      {/* Banner de Información de Clasificación a Playoffs */}
-      {(() => {
-        const limiteClasificados = obtenerLimiteClasificados(categoriaActiva);
-        const nombreFase = obtenerNombreFaseClasificacion(categoriaActiva);
-
-        return (
-          <>
-            {limiteClasificados > 0 ? (
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4 px-4 py-3 bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border border-emerald-200 rounded-2xl shadow-xs">
-                <div className="flex items-center gap-2.5">
-                  <span className="flex h-3 w-3 relative shrink-0">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
-                  </span>
-                  <span className="text-xs md:text-sm font-extrabold text-emerald-950">
-                    Zona de Clasificación: <span className="text-emerald-700 underline decoration-emerald-400 decoration-2">Top {limiteClasificados} equipos avanzan a {nombreFase}</span>
-                  </span>
-                </div>
-                <span className="text-[11px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-100/90 border border-emerald-300 px-3 py-1 rounded-full shadow-xs shrink-0">
-                  ⭐ {limiteClasificados} Clasificados ({categoriaActiva})
-                </span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2.5 mb-4 px-4 py-2.5 bg-blue-50/80 border border-blue-200 rounded-2xl text-blue-900 text-xs md:text-sm font-semibold">
-                <span className="text-base">🏀</span>
-                <span>Categoría {categoriaActiva} (Formativa / Recreativa - Todos los equipos participan sin corte clasificatorio).</span>
-              </div>
-            )}
-
-            {/* Diseño de la Tabla de Posiciones */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      {/* Diseño de la Tabla de Posiciones */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[750px] text-left border-collapse">
                   <thead>
@@ -377,9 +349,6 @@ export default function TablaPosiciones() {
                 </div>
               </div>
             </div>
-          </>
-        );
-      })()}
 
       {/* 🏀 MODAL RESUMEN DE PARTIDOS DEL EQUIPO */}
       {equipoModal && (
