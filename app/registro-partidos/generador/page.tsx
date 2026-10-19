@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/app/supabase';
 import { toPng } from 'html-to-image';
+import { obtenerLimiteClasificados } from '@/lib/categorias';
 
 export default function GeneradorGraficas() {
   // Pestaña activa: 'calendario' o 'posiciones'
@@ -28,7 +29,7 @@ export default function GeneradorGraficas() {
   const [formatoPosiciones, setFormatoPosiciones] = useState<'1080x1920' | '1080x1440'>('1080x1920');
   const [fondoPosiciones, setFondoPosiciones] = useState<string>('dark_premium');
   const [tituloFase, setTituloFase] = useState('TEMPORADA REGULAR 2026');
-  const [limiteClasificados, setLimiteClasificados] = useState<number>(4);
+  const [limiteClasificados, setLimiteClasificados] = useState<number>(obtenerLimiteClasificados(CATEGORIAS[1]));
   const [tablaPosiciones, setTablaPosiciones] = useState<any[]>([]);
   const [cargandoPosiciones, setCargandoPosiciones] = useState(false);
   const graficaPosicionesRef = useRef<HTMLDivElement>(null);
@@ -40,6 +41,7 @@ export default function GeneradorGraficas() {
   useEffect(() => {
     if (modo === 'posiciones') {
       cargarPosiciones(categoriaPosiciones);
+      setLimiteClasificados(obtenerLimiteClasificados(categoriaPosiciones));
     }
   }, [modo, categoriaPosiciones]);
 
@@ -411,7 +413,11 @@ export default function GeneradorGraficas() {
                   <select 
                     className="w-full border-2 border-gray-300 focus:border-blue-500 rounded-xl p-2.5 font-bold text-sm outline-none"
                     value={categoriaPosiciones}
-                    onChange={(e) => setCategoriaPosiciones(e.target.value)}
+                    onChange={(e) => {
+                      const nuevaCat = e.target.value;
+                      setCategoriaPosiciones(nuevaCat);
+                      setLimiteClasificados(obtenerLimiteClasificados(nuevaCat));
+                    }}
                   >
                     {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
@@ -486,9 +492,9 @@ export default function GeneradorGraficas() {
                     value={limiteClasificados}
                     onChange={(e) => setLimiteClasificados(parseInt(e.target.value, 10))}
                   >
-                    <option value={4}>Top 4 (Clasifican a Semifinales)</option>
+                    <option value={8}>Top 8 (Clasifican a Cuartos de Final)</option>
                     <option value={6}>Top 6 (Clasifican a Playoffs)</option>
-                    <option value={8}>Top 8 (Clasifican a Cuartos)</option>
+                    <option value={4}>Top 4 (Clasifican a Semifinales)</option>
                     <option value={0}>Sin línea divisoria</option>
                   </select>
                 </div>

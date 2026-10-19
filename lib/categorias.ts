@@ -34,3 +34,32 @@ export function ordenarCategorias(categorias: string[]): string[] {
   if (!Array.isArray(categorias)) return [];
   return [...categorias].sort(compararCategorias);
 }
+
+/**
+ * Retorna el número de equipos que clasifican a Playoffs según la categoría:
+ * - U10: 8 clasificados (Cuartos de final)
+ * - U12: 8 clasificados (Cuartos de final)
+ * - U14: 8 clasificados (Cuartos de final)
+ * - U16 (Femenino y Masculino): 4 clasificados (Semifinales)
+ * - U18 / U20: 4 clasificados
+ * - U8: 0 (Formativa / Recreativa)
+ */
+export function obtenerLimiteClasificados(categoria: string): number {
+  if (!categoria) return 0;
+  const cat = categoria.trim();
+  if (cat === 'U10' || cat === 'U12' || cat === 'U14') return 8;
+  if (cat.includes('U16')) return 4;
+  if (cat === 'U18' || cat === 'U20') return 4;
+  return 0;
+}
+
+/**
+ * Retorna el nombre de la fase a la que avanzan los clasificados
+ */
+export function obtenerNombreFaseClasificacion(categoria: string): string {
+  const limite = obtenerLimiteClasificados(categoria);
+  if (limite === 8) return 'Cuartos de Final';
+  if (limite === 4) return 'Semifinales';
+  return 'Playoffs';
+}
+

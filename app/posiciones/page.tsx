@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import { supabase } from "../supabase"; 
+import { obtenerLimiteClasificados, obtenerNombreFaseClasificacion } from "@/lib/categorias"; 
 
 export default function TablaPosiciones() {
   const categorias = ["U8", "U10", "U12", "U14", "U16 Femenino", "U16 Masculino", "U18", "U20"];
@@ -212,75 +213,173 @@ export default function TablaPosiciones() {
           </button>
         ))}
       </div>
+      {/* Fin Selector de Categorías */}
 
-      {/* Diseño de la Tabla de Posiciones */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[750px] text-left border-collapse">
-            <thead>
-              <tr className="bg-gray-50 text-gray-500 text-[11px] md:text-xs uppercase tracking-wider border-b border-gray-200">
-                <th className="px-3 py-4 font-bold text-center">Pos</th>
-                <th className="px-3 py-4 font-bold">Equipo</th>
-                <th className="px-3 py-4 font-bold text-center">PJ</th>
-                <th className="px-3 py-4 font-bold text-center">JG</th>
-                <th className="px-3 py-4 font-bold text-center">JP</th>
-                <th className="px-3 py-4 font-bold text-center">PF</th>
-                <th className="px-3 py-4 font-bold text-center">PC</th>
-                <th className="px-3 py-4 font-bold text-center">DIF</th>
-                <th className="px-3 py-4 font-bold text-center text-blue-600">PTS</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {cargando ? (
-                <tr>
-                  <td colSpan={9} className="text-center py-12 text-gray-500 font-bold text-sm">Calculando posiciones...</td>
-                </tr>
-              ) : posiciones.length === 0 ? (
-                <tr>
-                  <td colSpan={9} className="text-center py-12 text-gray-500 font-bold text-sm">No hay equipos registrados o partidos finalizados en esta categoría.</td>
-                </tr>
-              ) : (
-                posiciones.map((equipo, index) => (
-                  <tr 
-                    key={equipo.id} 
-                    onClick={() => abrirHistorialEquipo(equipo)}
-                    className="hover:bg-blue-50/70 transition-all cursor-pointer group select-none"
-                    title="Haz clic para ver el resumen de partidos de este equipo"
-                  >
-                    <td className="px-3 py-4 font-black text-gray-900 text-center">{index + 1}</td>
-                    <td className="px-3 py-4 flex items-center justify-between font-bold text-sm md:text-base text-gray-900 uppercase whitespace-nowrap">
-                      <div className="flex items-center gap-2 md:gap-3">
-                        <div className="w-7 h-7 md:w-8 md:h-8 bg-gray-100 rounded-full flex items-center justify-center shrink-0 border border-gray-200 group-hover:scale-110 transition-transform">
-                          {equipo.logo_url ? (
-                            <img src={equipo.logo_url} alt={equipo.nombre} className="w-full h-full object-contain p-0.5 rounded-full" />
-                          ) : (
-                            <span className="text-gray-400 text-[10px] md:text-xs">{equipo.nombre.charAt(0)}</span>
-                          )}
-                        </div>
-                        <span className="truncate max-w-[150px] md:max-w-none group-hover:text-blue-600 transition-colors">
-                          {equipo.nombre}
-                        </span>
-                      </div>
-                      <span className="text-[10px] text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity font-bold ml-2 hidden sm:inline">
-                        Ver partidos ➔
-                      </span>
-                    </td>
-                    <td className="px-3 py-4 text-center font-semibold text-gray-600 text-sm md:text-base">{equipo.pj}</td>
-                    <td className="px-3 py-4 text-center font-bold text-green-600 text-sm md:text-base">{equipo.jg}</td>
-                    <td className="px-3 py-4 text-center font-bold text-red-500 text-sm md:text-base">{equipo.jp}</td>
-                    <td className="px-3 py-4 text-center font-semibold text-gray-600 text-sm md:text-base">{equipo.pf}</td>
-                    <td className="px-3 py-4 text-center font-semibold text-gray-600 text-sm md:text-base">{equipo.pc}</td>
-                    <td className="px-3 py-4 text-center font-bold text-gray-800 text-sm md:text-base">
-                      {(equipo.pf - equipo.pc) > 0 ? `+${equipo.pf - equipo.pc}` : equipo.pf - equipo.pc}
-                    </td>
-                    <td className="px-3 py-4 text-center font-black text-blue-600 text-base md:text-lg">{equipo.pts}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {/* Banner de Información de Clasificación a Playoffs */}
+      {(() => {
+        const limiteClasificados = obtenerLimiteClasificados(categoriaActiva);
+        const nombreFase = obtenerNombreFaseClasificacion(categoriaActiva);
+
+        return (
+          <>
+            {limiteClasificados > 0 ? (
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4 px-4 py-3 bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border border-emerald-200 rounded-2xl shadow-xs">
+                <div className="flex items-center gap-2.5">
+                  <span className="flex h-3 w-3 relative shrink-0">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                  </span>
+                  <span className="text-xs md:text-sm font-extrabold text-emerald-950">
+                    Zona de Clasificación: <span className="text-emerald-700 underline decoration-emerald-400 decoration-2">Top {limiteClasificados} equipos avanzan a {nombreFase}</span>
+                  </span>
+                </div>
+                <span className="text-[11px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-100/90 border border-emerald-300 px-3 py-1 rounded-full shadow-xs shrink-0">
+                  ⭐ {limiteClasificados} Clasificados ({categoriaActiva})
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2.5 mb-4 px-4 py-2.5 bg-blue-50/80 border border-blue-200 rounded-2xl text-blue-900 text-xs md:text-sm font-semibold">
+                <span className="text-base">🏀</span>
+                <span>Categoría {categoriaActiva} (Formativa / Recreativa - Todos los equipos participan sin corte clasificatorio).</span>
+              </div>
+            )}
+
+            {/* Diseño de la Tabla de Posiciones */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[750px] text-left border-collapse">
+                  <thead>
+                    <tr className="bg-gray-50 text-gray-500 text-[11px] md:text-xs uppercase tracking-wider border-b border-gray-200">
+                      <th className="px-3 py-4 font-bold text-center">Pos</th>
+                      <th className="px-3 py-4 font-bold">Equipo</th>
+                      <th className="px-3 py-4 font-bold text-center">PJ</th>
+                      <th className="px-3 py-4 font-bold text-center">JG</th>
+                      <th className="px-3 py-4 font-bold text-center">JP</th>
+                      <th className="px-3 py-4 font-bold text-center">PF</th>
+                      <th className="px-3 py-4 font-bold text-center">PC</th>
+                      <th className="px-3 py-4 font-bold text-center">DIF</th>
+                      <th className="px-3 py-4 font-bold text-center text-blue-600">PTS</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {cargando ? (
+                      <tr>
+                        <td colSpan={9} className="text-center py-12 text-gray-500 font-bold text-sm">Calculando posiciones...</td>
+                      </tr>
+                    ) : posiciones.length === 0 ? (
+                      <tr>
+                        <td colSpan={9} className="text-center py-12 text-gray-500 font-bold text-sm">No hay equipos registrados o partidos finalizados en esta categoría.</td>
+                      </tr>
+                    ) : (
+                      posiciones.map((equipo, index) => {
+                        const pos = index + 1;
+                        const esClasificado = limiteClasificados > 0 && pos <= limiteClasificados;
+                        const esUltimoClasificado = limiteClasificados > 0 && pos === limiteClasificados && pos < posiciones.length;
+
+                        return (
+                          <Fragment key={equipo.id}>
+                            <tr 
+                              onClick={() => abrirHistorialEquipo(equipo)}
+                              className={`transition-all cursor-pointer group select-none ${
+                                esClasificado 
+                                  ? 'bg-emerald-50/25 hover:bg-emerald-100/40' 
+                                  : 'hover:bg-blue-50/70'
+                              }`}
+                              title="Haz clic para ver el resumen de partidos de este equipo"
+                            >
+                              <td className={`px-3 py-4 font-black text-center relative ${
+                                esClasificado ? 'border-l-4 border-emerald-500' : 'border-l-4 border-transparent'
+                              }`}>
+                                <div className="flex items-center justify-center">
+                                  <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black ${
+                                    pos === 1 ? 'bg-amber-400 text-amber-950 shadow-xs' :
+                                    pos === 2 ? 'bg-slate-300 text-slate-900 shadow-xs' :
+                                    pos === 3 ? 'bg-amber-700 text-white shadow-xs' :
+                                    esClasificado ? 'bg-emerald-100 text-emerald-800 font-black' :
+                                    'text-gray-700'
+                                  }`}>
+                                    {pos}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="px-3 py-4 flex items-center justify-between font-bold text-sm md:text-base text-gray-900 uppercase whitespace-nowrap">
+                                <div className="flex items-center gap-2 md:gap-3">
+                                  <div className="w-7 h-7 md:w-8 md:h-8 bg-gray-100 rounded-full flex items-center justify-center shrink-0 border border-gray-200 group-hover:scale-110 transition-transform">
+                                    {equipo.logo_url ? (
+                                      <img src={equipo.logo_url} alt={equipo.nombre} className="w-full h-full object-contain p-0.5 rounded-full" />
+                                    ) : (
+                                      <span className="text-gray-400 text-[10px] md:text-xs">{equipo.nombre.charAt(0)}</span>
+                                    )}
+                                  </div>
+                                  <span className="truncate max-w-[150px] md:max-w-none group-hover:text-blue-600 transition-colors">
+                                    {equipo.nombre}
+                                  </span>
+                                  {esClasificado && (
+                                    <span className="hidden xl:inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-emerald-700 bg-emerald-100/90 px-2 py-0.5 rounded-md border border-emerald-300/80 shrink-0">
+                                      ⭐ Clasificado
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-[10px] text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity font-bold ml-2 hidden sm:inline">
+                                  Ver partidos ➔
+                                </span>
+                              </td>
+                              <td className="px-3 py-4 text-center font-semibold text-gray-600 text-sm md:text-base">{equipo.pj}</td>
+                              <td className="px-3 py-4 text-center font-bold text-green-600 text-sm md:text-base">{equipo.jg}</td>
+                              <td className="px-3 py-4 text-center font-bold text-red-500 text-sm md:text-base">{equipo.jp}</td>
+                              <td className="px-3 py-4 text-center font-semibold text-gray-600 text-sm md:text-base">{equipo.pf}</td>
+                              <td className="px-3 py-4 text-center font-semibold text-gray-600 text-sm md:text-base">{equipo.pc}</td>
+                              <td className="px-3 py-4 text-center font-bold text-gray-800 text-sm md:text-base">
+                                {(equipo.pf - equipo.pc) > 0 ? `+${equipo.pf - equipo.pc}` : equipo.pf - equipo.pc}
+                              </td>
+                              <td className="px-3 py-4 text-center font-black text-blue-600 text-base md:text-lg">{equipo.pts}</td>
+                            </tr>
+
+                            {/* LÍNEA DIVISORIA DE CLASIFICACIÓN A PLAYOFFS */}
+                            {esUltimoClasificado && (
+                              <tr key={`separador-playoffs-${pos}`} className="bg-gradient-to-r from-emerald-100/70 via-emerald-200/90 to-emerald-100/70 border-y-2 border-dashed border-emerald-400 select-none">
+                                <td colSpan={9} className="py-2.5 px-4 text-center">
+                                  <div className="flex items-center justify-center gap-3 text-emerald-950 font-black text-[11px] md:text-xs uppercase tracking-wider">
+                                    <div className="hidden sm:block flex-1 h-[1.5px] bg-gradient-to-r from-transparent via-emerald-400 to-transparent"></div>
+                                    <span className="flex items-center gap-1.5 bg-white px-3.5 py-1 rounded-full border border-emerald-300 shadow-xs">
+                                      <span className="text-emerald-500">⭐</span>
+                                      <span>LÍMITE DE CLASIFICACIÓN ({limiteClasificados} CLASIFICADOS A {nombreFase.toUpperCase()})</span>
+                                      <span className="text-emerald-500">⭐</span>
+                                    </span>
+                                    <div className="hidden sm:block flex-1 h-[1.5px] bg-gradient-to-r from-transparent via-emerald-400 to-transparent"></div>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </Fragment>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pie de tabla con leyenda explicativa */}
+              <div className="p-4 bg-gray-50 border-t border-gray-200 flex flex-wrap items-center justify-between gap-3 text-xs text-gray-600">
+                <div className="flex flex-wrap items-center gap-3 md:gap-4">
+                  {limiteClasificados > 0 && (
+                    <div className="flex items-center gap-1.5 font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span>
+                      <span>Puestos 1 al {limiteClasificados}: Zona de Clasificación a {nombreFase}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-1.5 text-gray-500">
+                    <span>💡 Haz clic en cualquier equipo para ver el resumen de sus partidos.</span>
+                  </div>
+                </div>
+                <div className="font-semibold text-gray-400">
+                  Libalnna Oficial
+                </div>
+              </div>
+            </div>
+          </>
+        );
+      })()}
 
       {/* 🏀 MODAL RESUMEN DE PARTIDOS DEL EQUIPO */}
       {equipoModal && (
