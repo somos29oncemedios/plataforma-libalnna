@@ -96,32 +96,20 @@ export default function PanelEmparejamientos() {
       return e.categoria === cat;
     });
     const isDoble = cat === "U16 Femenino" || cat === "U16 Masculino";
+    const maxPermitido = isDoble ? 2 : 1;
     const partidosCat = partidosTotales.filter(p => p.categoria === cat);
-    const paraDescontar = [...partidosCat];
     
     for (let i = 0; i < equiposCat.length; i++) {
-      for (let j = 0; j < equiposCat.length; j++) {
-        if (i === j) continue;
-        if (isDoble || i < j) {
-          const idLocal = equiposCat[i].id;
-          const idVisita = equiposCat[j].id;
-          let idx = -1;
-          
-          if (isDoble) {
-            idx = paraDescontar.findIndex(p => p.equipo_local_id === idLocal && p.equipo_visitante_id === idVisita);
-          } else {
-            idx = paraDescontar.findIndex(p => 
-              (p.equipo_local_id === idLocal && p.equipo_visitante_id === idVisita) ||
-              (p.equipo_local_id === idVisita && p.equipo_visitante_id === idLocal)
-            );
-          }
-          
-          if (idx !== -1) {
-            paraDescontar.splice(idx, 1);
-          } else {
-            globalPorAgendar++;
-          }
-        }
+      for (let j = i + 1; j < equiposCat.length; j++) {
+        const idA = equiposCat[i].id;
+        const idB = equiposCat[j].id;
+        const existentes = partidosCat.filter(p => 
+          (p.equipo_local_id === idA && p.equipo_visitante_id === idB) ||
+          (p.equipo_local_id === idB && p.equipo_visitante_id === idA)
+        ).length;
+        
+        const faltantes = Math.max(0, maxPermitido - existentes);
+        globalPorAgendar += faltantes;
       }
     }
   });
@@ -144,51 +132,67 @@ export default function PanelEmparejamientos() {
   const programadosAgrupados = agruparPartidos(programados);
   const jugadosAgrupados = agruparPartidos(jugados);
 
-  const emparejamientosIdeales = [];
+  const pendientes: any[] = [];
   if (categoriaActiva !== "Todas") {
+    const maxPermitido = isDobleRonda ? 2 : 1;
+
     for (let i = 0; i < equiposCategoria.length; i++) {
-      for (let j = 0; j < equiposCategoria.length; j++) {
-        if (i === j) continue; 
+      for (let j = i + 1; j < equiposCategoria.length; j++) {
+        const eqA = equiposCategoria[i];
+        const eqB = equiposCategoria[j];
+
+        // Partidos existentes entre eqA y eqB en esta categoría (cualquier estado: borrador, programado, finalizado)
+        const partidosPar = partidosCategoria.filter(p =>
+          (p.equipo_local_id === eqA.id && p.equipo_visitante_id === eqB.id) ||
+          (p.equipo_local_id === eqB.id && p.equipo_visitante_id === eqA.id)
+        );
+
+        const existentes = partidosPar.length;
+
         if (isDobleRonda) {
-          emparejamientosIdeales.push({
-            id: `${equiposCategoria[i].id}-${equiposCategoria[j].id}`,
-            local: equiposCategoria[i],
-            visitante: equiposCategoria[j]
-          });
-        } else if (i < j) {
-          emparejamientosIdeales.push({
-            id: `${equiposCategoria[i].id}-${equiposCategoria[j].id}`,
-            local: equiposCategoria[i],
-            visitante: equiposCategoria[j]
-          });
+          if (existentes === 0) {
+            // Faltan ambos juegos (Ida y Vuelta)
+            pendientes.push({
+              id: `${eqA.id}-${eqB.id}-j1`,
+              local: eqA,
+              visitante: eqB,
+              etiqueta: "Juego 1 de 2"
+            });
+            pendientes.push({
+              id: `${eqB.id}-${eqA.id}-j2`,
+              local: eqB,
+              visitante: eqA,
+              etiqueta: "Juego 2 de 2"
+            });
+          } else if (existentes === 1) {
+            // Ya se jugó o agendó 1 partido. Falta el 2do juego.
+            const partido1 = partidosPar[0];
+            // Si en el partido 1 eqA fue local, sugerimos que en el partido 2 eqB sea local
+            const eqLocalSugerido = partido1.equipo_local_id === eqA.id ? eqB : eqA;
+            const eqVisitaSugerido = partido1.equipo_local_id === eqA.id ? eqA : eqB;
+
+            pendientes.push({
+              id: `${eqLocalSugerido.id}-${eqVisitaSugerido.id}-j2`,
+              local: eqLocalSugerido,
+              visitante: eqVisitaSugerido,
+              etiqueta: "Juego 2 de 2 (Vuelta)"
+            });
+          }
+          // Si existentes >= 2, no se genera ningún cruce adicional porque ya se cumplió el límite de 2 encuentros
+        } else {
+          // Ronda simple: máximo 1 juego
+          if (existentes === 0) {
+            pendientes.push({
+              id: `${eqA.id}-${eqB.id}`,
+              local: eqA,
+              visitante: eqB,
+              etiqueta: "Juego Único"
+            });
+          }
         }
       }
     }
   }
-
-  const pendientes: any[] = [];
-  const partidosParaDescontar = [...partidosCategoria];
-
-  emparejamientosIdeales.forEach(emp => {
-    let indexExistente = -1;
-
-    if (isDobleRonda) {
-      indexExistente = partidosParaDescontar.findIndex(p => 
-        p.equipo_local_id === emp.local.id && p.equipo_visitante_id === emp.visitante.id
-      );
-    } else {
-      indexExistente = partidosParaDescontar.findIndex(p => 
-        (p.equipo_local_id === emp.local.id && p.equipo_visitante_id === emp.visitante.id) ||
-        (p.equipo_local_id === emp.visitante.id && p.equipo_visitante_id === emp.local.id)
-      );
-    }
-
-    if (indexExistente !== -1) {
-      partidosParaDescontar.splice(indexExistente, 1);
-    } else {
-      pendientes.push(emp);
-    }
-  });
 
   // 🏀 FUNCIONES DE ACCIÓN: NUEVOS PARTIDOS
   const actualizarBorrador = (id: string, campo: string, valor: string) => {
@@ -219,6 +223,35 @@ export default function PanelEmparejamientos() {
     const isInvertido = equiposInvertidos[emparejamiento.id];
     const equipoLocalDefinitivo = isInvertido ? emparejamiento.visitante : emparejamiento.local;
     const equipoVisitanteDefinitivo = isInvertido ? emparejamiento.local : emparejamiento.visitante;
+
+    // 🔒 VALIDACIÓN ESTRICTA DE CRUCES
+    const isDoble = categoriaActiva === "U16 Femenino" || categoriaActiva === "U16 Masculino";
+    const maxPermitido = isDoble ? 2 : 1;
+
+    // 1. Verificación en memoria (partidos ya cargados)
+    const partidosExistentes = partidosTotales.filter(p =>
+      p.categoria === categoriaActiva &&
+      ((p.equipo_local_id === equipoLocalDefinitivo.id && p.equipo_visitante_id === equipoVisitanteDefinitivo.id) ||
+       (p.equipo_local_id === equipoVisitanteDefinitivo.id && p.equipo_visitante_id === equipoLocalDefinitivo.id))
+    );
+
+    if (partidosExistentes.length >= maxPermitido) {
+      alert(`⚠️ Límite de cruces alcanzado: En ${categoriaActiva} solo se permiten ${maxPermitido} juego(s) entre ${equipoLocalDefinitivo.nombre} y ${equipoVisitanteDefinitivo.nombre}. Ya existen ${partidosExistentes.length} juego(s) en el sistema.`);
+      return;
+    }
+
+    // 2. Verificación en tiempo real contra Supabase (evita condiciones de carrera o desincronización)
+    const { data: crucesEnBd, error: errorCheck } = await supabase
+      .from('partidos')
+      .select('id')
+      .eq('categoria', categoriaActiva)
+      .or(`and(equipo_local_id.eq.${equipoLocalDefinitivo.id},equipo_visitante_id.eq.${equipoVisitanteDefinitivo.id}),and(equipo_local_id.eq.${equipoVisitanteDefinitivo.id},equipo_visitante_id.eq.${equipoLocalDefinitivo.id})`);
+
+    if (!errorCheck && crucesEnBd && crucesEnBd.length >= maxPermitido) {
+      alert(`⚠️ Límite de cruces alcanzado en base de datos: Ya existen ${crucesEnBd.length} juego(s) entre estos equipos en ${categoriaActiva}. El formato solo permite ${maxPermitido}.`);
+      cargarDatos();
+      return;
+    }
 
     const confirmar = window.confirm(`¿Agendar ${equipoLocalDefinitivo.nombre} (Local) vs ${equipoVisitanteDefinitivo.nombre} (Visita) para el ${draft.fecha}?`);
     if (!confirmar) return;
@@ -617,10 +650,19 @@ export default function PanelEmparejamientos() {
                   const visitanteMostrar = isInvertido ? emp.local : emp.visitante;
 
                   return (
-                    <div key={emp.id} className="bg-white border-2 border-gray-200 rounded-xl p-4 md:p-6 flex flex-col xl:flex-row items-center gap-6 shadow-sm hover:shadow-md transition-shadow">
+                    <div key={emp.id} className="bg-white border-2 border-gray-200 rounded-xl p-4 md:p-6 flex flex-col xl:flex-row items-center gap-6 shadow-sm hover:shadow-md transition-shadow relative">
                       
+                      {/* Badge de Ronda si aplica */}
+                      {isDobleRonda && emp.etiqueta && (
+                        <div className="absolute top-2 left-4 md:top-2.5 md:left-5">
+                          <span className="bg-purple-100 text-purple-800 text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full border border-purple-200 tracking-wider">
+                            {emp.etiqueta}
+                          </span>
+                        </div>
+                      )}
+
                       {/* Visual del Partido */}
-                      <div className="flex items-center justify-between w-full xl:w-[45%] bg-gray-50 p-4 rounded-xl border border-gray-100">
+                      <div className={`flex items-center justify-between w-full xl:w-[45%] bg-gray-50 p-4 rounded-xl border border-gray-100 ${isDobleRonda ? 'mt-4 xl:mt-0' : ''}`}>
                         <div className="flex flex-col items-center gap-1.5 w-[42%]">
                           <span className="text-[8px] text-gray-400 font-black uppercase">Local</span>
                           <div className="w-10 h-10 md:w-12 md:h-12 bg-white rounded-full flex items-center justify-center overflow-hidden border border-gray-200 shadow-sm">
