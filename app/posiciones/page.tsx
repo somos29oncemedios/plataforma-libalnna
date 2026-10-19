@@ -286,11 +286,6 @@ export default function TablaPosiciones() {
                                   <span className="truncate max-w-[150px] md:max-w-none group-hover:text-blue-600 transition-colors">
                                     {equipo.nombre}
                                   </span>
-                                  {esClasificado && (
-                                    <span className="hidden xl:inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-emerald-700 bg-emerald-100/90 px-2 py-0.5 rounded-md border border-emerald-300/80 shrink-0">
-                                      ⭐ Clasificado
-                                    </span>
-                                  )}
                                 </div>
                                 <span className="text-[10px] text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity font-bold ml-2 hidden sm:inline">
                                   Ver partidos ➔
