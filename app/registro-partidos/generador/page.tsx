@@ -32,6 +32,9 @@ export default function GeneradorGraficas() {
   const [limiteClasificados, setLimiteClasificados] = useState<number>(obtenerLimiteClasificados(CATEGORIAS[1]));
   const [tablaPosiciones, setTablaPosiciones] = useState<any[]>([]);
   const [cargandoPosiciones, setCargandoPosiciones] = useState(false);
+  const [partePosiciones, setPartePosiciones] = useState<1 | 2>(1);
+  const [modoDivision, setModoDivision] = useState<'auto' | 'forzar_2' | 'forzar_1'>('auto');
+  const [cortePersonalizado, setCortePersonalizado] = useState<number | null>(null);
   const graficaPosicionesRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -253,17 +256,61 @@ export default function GeneradorGraficas() {
     }
   };
 
-  const descargarImagenPosiciones = async () => {
+  // Lógica de detección y particionado de Tabla de Posiciones
+  const esStory = formatoPosiciones === '1080x1920';
+  const limiteEquiposPorImagen = esStory ? 10 : 7;
+  const detectaExcesoEquipos = tablaPosiciones.length > limiteEquiposPorImagen;
+  const esModoDosPartes = modoDivision === 'forzar_2' 
+    ? true 
+    : modoDivision === 'forzar_1' 
+      ? false 
+      : detectaExcesoEquipos;
+
+  const calcularCorteOptimo = () => {
+    if (cortePersonalizado !== null && cortePersonalizado > 0 && cortePersonalizado < tablaPosiciones.length) {
+      return cortePersonalizado;
+    }
+    const total = tablaPosiciones.length;
+    if (limiteClasificados > 0 && limiteClasificados < total) {
+      const restantes = total - limiteClasificados;
+      // Si ambos lados caben en la capacidad máxima de la imagen:
+      if (limiteClasificados <= (esStory ? 10 : 8) && restantes <= (esStory ? 10 : 8)) {
+        return limiteClasificados;
+      }
+    }
+    return Math.ceil(total / 2);
+  };
+
+  const corteParte1 = calcularCorteOptimo();
+
+  const equiposAMostrar = esModoDosPartes
+    ? (partePosiciones === 1 ? tablaPosiciones.slice(0, corteParte1) : tablaPosiciones.slice(corteParte1))
+    : (esStory ? tablaPosiciones.slice(0, 10) : tablaPosiciones.slice(0, 7));
+
+  const offsetPosicion = (esModoDosPartes && partePosiciones === 2) ? corteParte1 : 0;
+
+  const numEquiposMostrados = equiposAMostrar.length;
+  const rowHeightClass = esStory 
+    ? (numEquiposMostrados >= 10 ? 'h-[88px]' : 'h-[96px]')
+    : (numEquiposMostrados >= 8 ? 'h-[78px]' : 'h-[86px]');
+  const rowGapClass = esStory
+    ? (numEquiposMostrados >= 10 ? 'gap-2.5' : 'gap-3.5')
+    : (numEquiposMostrados >= 8 ? 'gap-2' : 'gap-2.5');
+
+  const descargarImagenPosiciones = async (parteForzada?: number) => {
     if (graficaPosicionesRef.current === null) return;
     setGenerando(true);
     try {
+      const parteNum = parteForzada !== undefined ? parteForzada : (esModoDosPartes ? partePosiciones : undefined);
       const dataUrl = await toPng(graficaPosicionesRef.current, { 
         cacheBust: true,
         quality: 1,
         pixelRatio: 1
       });
       const link = document.createElement('a');
-      link.download = `Tabla_Posiciones_${categoriaPosiciones.replace(/\s+/g, '_')}_${formatoPosiciones}.png`;
+      const nombreCat = categoriaPosiciones.replace(/\s+/g, '_');
+      const sufijoParte = parteNum !== undefined ? `_Parte_${parteNum}_de_2` : '';
+      link.download = `Tabla_Posiciones_${nombreCat}${sufijoParte}_${formatoPosiciones}.png`;
       link.href = dataUrl;
       link.click();
     } catch (err) {
@@ -274,10 +321,49 @@ export default function GeneradorGraficas() {
     }
   };
 
+  const descargarAmbasPartes = async () => {
+    if (!graficaPosicionesRef.current || !esModoDosPartes) return;
+    setGenerando(true);
+    try {
+      // 1. Renderizar y descargar Parte 1
+      setPartePosiciones(1);
+      await new Promise(r => setTimeout(r, 450));
+      
+      const dataUrl1 = await toPng(graficaPosicionesRef.current, { 
+        cacheBust: true,
+        quality: 1,
+        pixelRatio: 1
+      });
+      const link1 = document.createElement('a');
+      const nombreCat = categoriaPosiciones.replace(/\s+/g, '_');
+      link1.download = `Tabla_Posiciones_${nombreCat}_Parte_1_de_2_${formatoPosiciones}.png`;
+      link1.href = dataUrl1;
+      link1.click();
+
+      // 2. Renderizar y descargar Parte 2
+      setPartePosiciones(2);
+      await new Promise(r => setTimeout(r, 550));
+
+      const dataUrl2 = await toPng(graficaPosicionesRef.current, { 
+        cacheBust: true,
+        quality: 1,
+        pixelRatio: 1
+      });
+      const link2 = document.createElement('a');
+      link2.download = `Tabla_Posiciones_${nombreCat}_Parte_2_de_2_${formatoPosiciones}.png`;
+      link2.href = dataUrl2;
+      link2.click();
+
+    } catch (err) {
+      console.error('Error al descargar ambas partes', err);
+      alert('Hubo un error al generar una de las imágenes.');
+    } finally {
+      setGenerando(false);
+    }
+  };
+
   const sedesDisponibles = Array.from(new Set(partidos.filter(p => p.fecha === fechaSeleccionada).map(p => p.lugar).filter(Boolean))) as string[];
   const partidosAMostrar = partidos.filter(p => p.fecha === fechaSeleccionada && p.lugar === sedeSeleccionada);
-
-  const esStory = formatoPosiciones === '1080x1920';
 
   return (
     <div className="min-h-screen bg-gray-100 p-4 md:p-8">
@@ -417,6 +503,8 @@ export default function GeneradorGraficas() {
                       const nuevaCat = e.target.value;
                       setCategoriaPosiciones(nuevaCat);
                       setLimiteClasificados(obtenerLimiteClasificados(nuevaCat));
+                      setPartePosiciones(1);
+                      setCortePersonalizado(null);
                     }}
                   >
                     {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
@@ -429,7 +517,10 @@ export default function GeneradorGraficas() {
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
-                      onClick={() => setFormatoPosiciones('1080x1920')}
+                      onClick={() => {
+                        setFormatoPosiciones('1080x1920');
+                        setPartePosiciones(1);
+                      }}
                       className={`py-2.5 px-2 rounded-xl font-black text-xs uppercase border-2 transition-all flex flex-col items-center gap-1 ${
                         formatoPosiciones === '1080x1920'
                           ? 'border-blue-600 bg-blue-50 text-blue-800 shadow-sm'
@@ -443,7 +534,10 @@ export default function GeneradorGraficas() {
 
                     <button
                       type="button"
-                      onClick={() => setFormatoPosiciones('1080x1440')}
+                      onClick={() => {
+                        setFormatoPosiciones('1080x1440');
+                        setPartePosiciones(1);
+                      }}
                       className={`py-2.5 px-2 rounded-xl font-black text-xs uppercase border-2 transition-all flex flex-col items-center gap-1 ${
                         formatoPosiciones === '1080x1440'
                           ? 'border-blue-600 bg-blue-50 text-blue-800 shadow-sm'
@@ -499,19 +593,118 @@ export default function GeneradorGraficas() {
                   </select>
                 </div>
 
+                {/* DETECCIÓN Y CONTROL DE DIVISIÓN EN 2 IMÁGENES */}
+                {tablaPosiciones.length > 0 && (
+                  <div className="flex flex-col gap-3 mt-1 border-t border-gray-200 pt-3">
+                    {detectaExcesoEquipos ? (
+                      <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-3.5 text-amber-950 shadow-sm">
+                        <div className="flex items-center gap-2 font-black text-xs uppercase tracking-wide text-amber-800">
+                          <span className="text-base">⚡</span>
+                          <span>Detección Automática: 2 Imágenes</span>
+                        </div>
+                        <p className="text-[11px] text-amber-800 mt-1 font-semibold leading-relaxed">
+                          Esta categoría cuenta con <span className="font-black text-amber-950">{tablaPosiciones.length} equipos</span> (el límite ideal en {esStory ? 'Historia' : 'Feed'} es {limiteEquiposPorImagen}). 
+                          Se divide automáticamente en <strong>2 imágenes</strong> para que todos los clubes, logos y estadísticas se vean con máxima nitidez.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 text-emerald-800 text-[11px] font-bold flex items-center justify-between">
+                        <span className="flex items-center gap-1.5">
+                          <span>✅</span>
+                          <span>Cabe en 1 sola imagen ({tablaPosiciones.length} de máx. {limiteEquiposPorImagen} equipos).</span>
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Selector de Parte 1 / Parte 2 */}
+                    {esModoDosPartes && (
+                      <div className="bg-gray-50 border border-gray-200 rounded-2xl p-3">
+                        <div className="flex justify-between items-center mb-2">
+                          <label className="text-xs font-black text-gray-800 uppercase tracking-tight">
+                            Imagen a Visualizar / Descargar
+                          </label>
+                          <span className="text-[10px] font-black uppercase text-purple-700 bg-purple-100 px-2.5 py-0.5 rounded-full border border-purple-200">
+                            Parte {partePosiciones} de 2
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setPartePosiciones(1)}
+                            className={`py-2.5 px-3 rounded-xl font-black text-xs uppercase border-2 transition-all flex flex-col items-center gap-1 text-center ${
+                              partePosiciones === 1
+                                ? 'border-purple-600 bg-purple-50 text-purple-900 shadow-sm'
+                                : 'border-gray-200 text-gray-600 hover:border-gray-300 bg-white'
+                            }`}
+                          >
+                            <span className="flex items-center gap-1">
+                              <span>📄</span>
+                              <span>Parte 1</span>
+                            </span>
+                            <span className="text-[10px] font-bold text-gray-500">
+                              Puestos 1 al {corteParte1} ({corteParte1} equipos)
+                            </span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setPartePosiciones(2)}
+                            className={`py-2.5 px-3 rounded-xl font-black text-xs uppercase border-2 transition-all flex flex-col items-center gap-1 text-center ${
+                              partePosiciones === 2
+                                ? 'border-purple-600 bg-purple-50 text-purple-900 shadow-sm'
+                                : 'border-gray-200 text-gray-600 hover:border-gray-300 bg-white'
+                            }`}
+                          >
+                            <span className="flex items-center gap-1">
+                              <span>📄</span>
+                              <span>Parte 2</span>
+                            </span>
+                            <span className="text-[10px] font-bold text-gray-500">
+                              Puestos {corteParte1 + 1} al {tablaPosiciones.length} ({tablaPosiciones.length - corteParte1} equipos)
+                            </span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="mt-1 p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-600 font-bold flex justify-between items-center">
                   <span>Equipos cargados:</span>
-                  <span className="text-blue-600 font-black text-sm">{tablaPosiciones.length}</span>
+                  <span className="text-blue-600 font-black text-sm">
+                    {tablaPosiciones.length} {esModoDosPartes ? `(Mostrando ${equiposAMostrar.length} en Parte ${partePosiciones})` : ''}
+                  </span>
                 </div>
 
-                {/* Botón de Descarga */}
-                <button 
-                  onClick={descargarImagenPosiciones}
-                  disabled={generando || tablaPosiciones.length === 0}
-                  className="mt-3 w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white font-black py-4 rounded-xl shadow-lg uppercase transition-all flex justify-center items-center gap-2 text-sm tracking-wide"
-                >
-                  {generando ? 'Generando PNG...' : `📥 Descargar Tabla (${formatoPosiciones})`}
-                </button>
+                {/* Botones de Descarga */}
+                {esModoDosPartes ? (
+                  <div className="flex flex-col gap-2 mt-2">
+                    <button 
+                      onClick={() => descargarImagenPosiciones()}
+                      disabled={generando || tablaPosiciones.length === 0}
+                      className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white font-black py-3.5 rounded-xl shadow-lg uppercase transition-all flex justify-center items-center gap-2 text-xs tracking-wide"
+                    >
+                      {generando ? 'Generando PNG...' : `📥 Descargar Parte ${partePosiciones} de 2 (${formatoPosiciones})`}
+                    </button>
+
+                    <button 
+                      onClick={descargarAmbasPartes}
+                      disabled={generando || tablaPosiciones.length === 0}
+                      className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 disabled:bg-gray-300 text-white font-black py-3 rounded-xl shadow-md uppercase transition-all flex justify-center items-center gap-2 text-xs tracking-wide"
+                      title="Genera y descarga consecutivamente la Parte 1 y la Parte 2"
+                    >
+                      {generando ? 'Procesando ambas...' : `📦 Descargar Ambas Imágenes (Parte 1 y 2)`}
+                    </button>
+                  </div>
+                ) : (
+                  <button 
+                    onClick={() => descargarImagenPosiciones()}
+                    disabled={generando || tablaPosiciones.length === 0}
+                    className="mt-3 w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white font-black py-4 rounded-xl shadow-lg uppercase transition-all flex justify-center items-center gap-2 text-sm tracking-wide"
+                  >
+                    {generando ? 'Generando PNG...' : `📥 Descargar Tabla (${formatoPosiciones})`}
+                  </button>
+                )}
 
               </div>
             </>
@@ -688,6 +881,19 @@ export default function GeneradorGraficas() {
                     </span>
                   </div>
 
+                  {/* Indicador de Parte 1 / Parte 2 cuando aplica */}
+                  {esModoDosPartes && (
+                    <div className="mt-3 bg-white/10 backdrop-blur-md px-6 py-1.5 rounded-full border border-white/20 shadow-lg flex items-center gap-3">
+                      <span className="text-yellow-400 font-black text-[20px] uppercase tracking-wider">
+                        PARTE {partePosiciones} DE 2
+                      </span>
+                      <span className="text-white/40">•</span>
+                      <span className="text-white font-bold text-[18px] uppercase tracking-wide">
+                        PUESTOS {partePosiciones === 1 ? `1 AL ${corteParte1}` : `${corteParte1 + 1} AL ${tablaPosiciones.length}`}
+                      </span>
+                    </div>
+                  )}
+
                 </div>
 
                 {/* 2. TABLA RESUMIDA (ÁREA CENTRAL) */}
@@ -713,9 +919,9 @@ export default function GeneradorGraficas() {
                       No hay equipos o partidos registrados en esta categoría.
                     </div>
                   ) : (
-                    <div className={`flex flex-col ${esStory ? 'gap-3.5' : 'gap-2.5'}`}>
-                      {tablaPosiciones.slice(0, esStory ? 10 : 7).map((eq, index) => {
-                        const pos = index + 1;
+                    <div className={`flex flex-col ${rowGapClass}`}>
+                      {equiposAMostrar.map((eq, index) => {
+                        const pos = offsetPosicion + index + 1;
                         const esTopPlayoffs = limiteClasificados > 0 && pos <= limiteClasificados;
 
                         // Estilos de medalla / posición
@@ -727,9 +933,7 @@ export default function GeneradorGraficas() {
                         return (
                           <div key={eq.id}>
                             <div 
-                              className={`w-full rounded-2xl flex items-center px-5 shadow-lg border transition-all ${
-                                esStory ? 'h-[96px]' : 'h-[86px]'
-                              } ${
+                              className={`w-full rounded-2xl flex items-center px-5 shadow-lg border transition-all ${rowHeightClass} ${
                                 fondoPosiciones === 'dark_premium'
                                   ? 'bg-white/95 text-slate-900 border-white/30'
                                   : 'bg-white text-slate-900 border-gray-200'
