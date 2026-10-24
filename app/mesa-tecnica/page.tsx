@@ -5,10 +5,13 @@ import { supabase } from '../supabase';
 import Link from 'next/link';
 
 export default function MesaTecnicaLobby() {
+  const categorias = ["Todas", "U8", "U10", "U12", "U14", "U16 Femenino", "U16 Masculino", "U18", "U20"];
+
   const [partidos, setPartidos] = useState<any[]>([]);
   const [cargando, setCargando] = useState(true);
+  const [categoriaActiva, setCategoriaActiva] = useState(categorias[0]);
+  const [seccionActiva, setSeccionActiva] = useState<"activos" | "finalizados" | "todos">("activos");
 
-  // Jugada inicial: Buscar el calendario
   useEffect(() => {
     const fetchPartidos = async () => {
       const { data, error } = await supabase
@@ -21,10 +24,11 @@ export default function MesaTecnicaLobby() {
           fase_torneo,
           lugar,
           categoria,
-          local:equipos!equipo_local_id(nombre),
-          visitante:equipos!equipo_visitante_id(nombre)
+          puntos_local,
+          puntos_visitante,
+          local:equipos!equipo_local_id(nombre, logo_url),
+          visitante:equipos!equipo_visitante_id(nombre, logo_url)
         `)
-        // Orden base cronológico desde Supabase
         .order('fecha', { ascending: true })
         .order('hora', { ascending: true });
 
@@ -34,106 +38,337 @@ export default function MesaTecnicaLobby() {
     fetchPartidos();
   }, []);
 
-  const formatearFechaHora = (fechaStr: string, horaStr: string) => {
-    if (!fechaStr || !horaStr) return "Fecha por definir";
+  const formatearFecha = (fechaStr: string) => {
+    if (!fechaStr) return "Fecha por definir";
     const [year, month, day] = fechaStr.split('-');
-    const meses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+    const dateObj = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    const diasSemana = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+    const nombreDia = diasSemana[dateObj.getDay()];
+    const meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
     const nombreMes = meses[parseInt(month, 10) - 1];
+    
+    return `${nombreDia}, ${day} de ${nombreMes} de ${year}`;
+  };
 
+  const formatearHora = (horaStr: string) => {
+    if (!horaStr) return "Hora por definir";
     let [h, m] = horaStr.split(':');
     let horaNum = parseInt(h, 10);
     const ampm = horaNum >= 12 ? 'PM' : 'AM';
     horaNum = horaNum % 12 || 12;
-    const horaFormateada = `${horaNum}:${m} ${ampm}`;
-
-    return `${day} ${nombreMes} - ${horaFormateada}`;
+    return `${horaNum}:${m} ${ampm}`;
   };
 
-  // 🏀 TÁCTICA: Ordenamiento Inteligente (Finalizados al fondo)
-  // Creamos una copia del array (usando [...partidos]) para no mutar el estado original directamente
-  const partidosOrdenados = [...partidos].sort((a, b) => {
-    // Si 'a' está finalizado y 'b' no, mandamos 'a' abajo (retorna 1)
-    if (a.estado === 'finalizado' && b.estado !== 'finalizado') return 1;
-    // Si 'b' está finalizado y 'a' no, mandamos 'b' abajo (retorna -1)
-    if (b.estado === 'finalizado' && a.estado !== 'finalizado') return -1;
-    // Si tienen el mismo estado (ej: ambos programados o ambos finalizados), 
-    // su orden cronológico original se mantiene porque ya vienen ordenados de Supabase.
-    return 0; 
+  // 1. Filtrar por Categoría
+  const partidosPorCategoria = categoriaActiva === "Todas"
+    ? partidos
+    : partidos.filter(p => p.categoria === categoriaActiva);
+
+  // 2. Filtrar por Sección (Activos/Por Jugar vs Finalizados vs Todos)
+  let partidosFiltrados = partidosPorCategoria.filter(p => {
+    if (seccionActiva === "activos") {
+      return p.estado !== "finalizado" && p.estado !== "borrador";
+    }
+    if (seccionActiva === "finalizados") {
+      return p.estado === "finalizado";
+    }
+    return p.estado !== "borrador"; // 'todos'
   });
 
+  // Si estamos en finalizados, podemos invertir para ver los más recientes primero
+  if (seccionActiva === "finalizados") {
+    partidosFiltrados = [...partidosFiltrados].reverse();
+  }
+
+  // 3. Agrupación Doble: FECHA -> SEDE -> PARTIDOS
+  const partidosAgrupados = partidosFiltrados.reduce((agrupacion: any, partido) => {
+    const fecha = partido.fecha || "Fecha por definir";
+    const sede = partido.lugar || "Sede por definir";
+
+    if (!agrupacion[fecha]) {
+      agrupacion[fecha] = {};
+    }
+    if (!agrupacion[fecha][sede]) {
+      agrupacion[fecha][sede] = [];
+    }
+    
+    agrupacion[fecha][sede].push(partido);
+    return agrupacion;
+  }, {});
+
+  // Contadores para las pestañas
+  const totalActivos = partidosPorCategoria.filter(p => p.estado !== "finalizado" && p.estado !== "borrador").length;
+  const totalFinalizados = partidosPorCategoria.filter(p => p.estado === "finalizado").length;
+  const totalTodos = partidosPorCategoria.filter(p => p.estado !== "borrador").length;
+
   return (
-    <main className="container mx-auto px-4 py-16 max-w-4xl">
-      <h1 className="text-4xl font-black text-center text-gray-900 mb-8 tracking-tight">
-        Mesa Técnica <span className="text-blue-600">Lobby Central</span>
-      </h1>
+    <main className="container mx-auto px-3 md:px-4 py-8 md:py-14 max-w-5xl">
+      {/* Encabezado */}
+      <div className="text-center mb-8">
+        <span className="bg-blue-100 text-blue-800 text-xs font-black px-4 py-1.5 rounded-full tracking-widest uppercase shadow-sm">
+          Panel de Control
+        </span>
+        <h1 className="text-3xl md:text-5xl font-black text-gray-900 uppercase tracking-tight mt-3">
+          Mesa Técnica <span className="text-blue-600">Lobby Central</span>
+        </h1>
+        <p className="text-gray-500 font-bold mt-2 text-sm md:text-base">
+          Selecciona un partido organizado por sede y horario para abrir la pizarra de anotación.
+        </p>
+      </div>
 
-      <div className="bg-white border border-gray-200 shadow-md rounded-xl p-8">
-        <h2 className="text-2xl font-bold mb-6 text-gray-800 border-b pb-4">
-          Seleccionar Partido a Anotar
-        </h2>
+      {/* Selector de Categorías (Scroll horizontal) */}
+      <div className="flex overflow-x-auto gap-2 mb-6 pb-2 justify-start md:justify-center scrollbar-hide">
+        {categorias.map((cat) => (
+          <button
+            key={cat}
+            onClick={() => setCategoriaActiva(cat)}
+            className={`px-4 py-2 rounded-full font-black text-xs md:text-sm uppercase tracking-wider transition-all whitespace-nowrap ${
+              categoriaActiva === cat
+                ? "bg-blue-600 text-white shadow-md scale-105"
+                : "bg-white text-gray-600 hover:bg-gray-100 hover:text-gray-900 border border-gray-200 shadow-sm"
+            }`}
+          >
+            {cat === "Todas" ? "Todas las Categorías" : cat}
+          </button>
+        ))}
+      </div>
 
-        {cargando ? (
-          <p className="text-center text-gray-500 font-semibold py-8">Buscando programación...</p>
-        ) : partidosOrdenados.length === 0 ? (
-          <p className="text-center text-gray-500 font-semibold py-8">No hay partidos programados en el calendario.</p>
-        ) : (
-          <div className="grid gap-4">
-            {partidosOrdenados.map((partido) => (
-              <div 
-                key={partido.id} 
-                className={`border rounded-lg p-6 flex flex-col md:flex-row justify-between items-center transition-colors shadow-sm ${
-                  partido.estado === 'finalizado' 
-                    ? 'border-gray-200 bg-gray-50 opacity-75' // Estilo apagado para finalizados
-                    : 'border-blue-200 bg-white hover:bg-blue-50' // Estilo destacado para activos
-                }`}
-              >
-                <div className="text-center md:text-left mb-4 md:mb-0 w-full md:w-2/3">
+      {/* Selector de Sección (Por Jugar / En Vivo vs Finalizados vs Todos) */}
+      <div className="flex justify-center gap-2 md:gap-4 mb-8 border-b border-gray-200 pb-4">
+        <button
+          onClick={() => setSeccionActiva("activos")}
+          className={`px-4 py-2.5 md:px-6 rounded-xl font-black text-xs md:text-sm uppercase tracking-wide transition-all flex items-center gap-2 ${
+            seccionActiva === "activos"
+              ? "bg-gray-900 text-white shadow-md"
+              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+          }`}
+        >
+          <span>🏀 Por Jugar / En Vivo</span>
+          <span className={`px-2 py-0.5 rounded-full text-[10px] ${
+            seccionActiva === "activos" ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-700"
+          }`}>
+            {totalActivos}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setSeccionActiva("finalizados")}
+          className={`px-4 py-2.5 md:px-6 rounded-xl font-black text-xs md:text-sm uppercase tracking-wide transition-all flex items-center gap-2 ${
+            seccionActiva === "finalizados"
+              ? "bg-green-600 text-white shadow-md"
+              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+          }`}
+        >
+          <span>🏁 Finalizados</span>
+          <span className={`px-2 py-0.5 rounded-full text-[10px] ${
+            seccionActiva === "finalizados" ? "bg-green-800 text-white" : "bg-gray-200 text-gray-700"
+          }`}>
+            {totalFinalizados}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setSeccionActiva("todos")}
+          className={`px-4 py-2.5 md:px-6 rounded-xl font-black text-xs md:text-sm uppercase tracking-wide transition-all flex items-center gap-2 ${
+            seccionActiva === "todos"
+              ? "bg-blue-600 text-white shadow-md"
+              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+          }`}
+        >
+          <span>📋 Todos</span>
+          <span className={`px-2 py-0.5 rounded-full text-[10px] ${
+            seccionActiva === "todos" ? "bg-blue-800 text-white" : "bg-gray-200 text-gray-700"
+          }`}>
+            {totalTodos}
+          </span>
+        </button>
+      </div>
+
+      {/* Lista de Partidos Agrupados */}
+      {cargando ? (
+        <div className="text-center py-20 font-bold text-gray-500 text-lg animate-pulse">
+          Cargando partidos de la Mesa Técnica...
+        </div>
+      ) : Object.keys(partidosAgrupados).length === 0 ? (
+        <div className="bg-white border-2 border-dashed border-gray-300 rounded-2xl p-12 text-center text-gray-500 font-bold">
+          <p className="text-xl mb-1">🏀 Sin partidos para mostrar</p>
+          <p className="text-sm text-gray-400">
+            No se encontraron partidos {seccionActiva === "activos" ? "activos o por jugar" : seccionActiva === "finalizados" ? "finalizados" : ""} en la categoría seleccionada.
+          </p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-8 md:gap-10">
+          {Object.entries(partidosAgrupados).map(([fecha, sedes]: [string, any]) => (
+            <div key={fecha} className="flex flex-col gap-6">
+              
+              {/* Sedes dentro de ese Día */}
+              {Object.entries(sedes).map(([sede, partidosDeSede]: [string, any]) => (
+                <div key={sede} className="flex flex-col gap-3">
                   
-                  {/* Etiquetas Superiores (Categoría, Lugar, Fecha/Hora) */}
-                  <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 mb-2">
-                     <span className="bg-blue-100 text-blue-800 text-xs font-bold px-2 py-1 rounded">
-                       Cat: {partido.categoria}
-                     </span>
-                     <span className="bg-gray-200 text-gray-700 text-xs font-bold px-2 py-1 rounded flex items-center gap-1">
-                        ⏱️ {formatearFechaHora(partido.fecha, partido.hora)}
-                     </span>
-                     <span className="text-xs font-bold text-gray-500 uppercase tracking-wide ml-1">
-                       📍 {partido.lugar}
-                     </span>
+                  {/* Encabezado: SEDE Y FECHA */}
+                  <div className="flex items-center flex-wrap gap-2 border-b-2 border-gray-200 pb-2">
+                    <span className="text-xl">📍</span>
+                    <h3 className="text-base md:text-xl font-black text-gray-900 uppercase tracking-wide flex items-center flex-wrap gap-2">
+                      <span>Sede: <span className="text-blue-600">{sede}</span></span>
+                      <span className="text-gray-300 text-sm hidden md:inline-block">|</span>
+                      <span className="text-gray-600 text-xs bg-gray-100 px-3 py-1 rounded-md tracking-normal normal-case font-bold border border-gray-200 shadow-sm">
+                        📅 {formatearFecha(fecha)}
+                      </span>
+                    </h3>
                   </div>
 
-                  {/* Nombres de los Equipos */}
-                  <p className="text-xl md:text-2xl font-black text-gray-900 mt-1 leading-tight">
-                    {partido.local?.nombre || 'Local'} <span className="text-gray-400 text-lg mx-2">VS</span> {partido.visitante?.nombre || 'Visitante'}
-                  </p>
-                  
-                  {/* Estado del Torneo y Juego */}
-                  <p className="text-sm text-gray-600 font-medium mt-2 flex items-center justify-center md:justify-start gap-2">
-                    {partido.fase_torneo} • Estado: 
-                    <span className={`uppercase font-black px-2 py-0.5 rounded text-[10px] ${
-                      partido.estado === 'finalizado' ? 'bg-red-100 text-red-700' : 
-                      partido.estado === 'en curso' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-                    }`}>
-                      {partido.estado}
-                    </span>
-                  </p>
-                </div>
+                  {/* Partidos de esa Sede (Ordenados por hora) */}
+                  <div className="flex flex-col gap-3 md:gap-4 mt-1">
+                    {partidosDeSede.map((partido: any) => {
+                      const esEnCurso = partido.estado === 'en curso';
+                      const esSuspendido = partido.estado === 'suspendido';
+                      const esFinalizado = partido.estado === 'finalizado';
 
-                <Link
-                  href={`/mesa-tecnica/${partido.id}`}
-                  className={`px-8 py-3 rounded-md font-bold transition-colors w-full md:w-auto text-center shadow-sm whitespace-nowrap ${
-                    partido.estado === 'finalizado'
-                      ? 'bg-gray-300 text-gray-800 hover:bg-gray-400' // Botón diferente si ya terminó
-                      : 'bg-gray-900 text-white hover:bg-blue-600'
-                  }`}
-                >
-                  {partido.estado === 'finalizado' ? 'Ver / Editar' : 'Abrir Pizarra'}
-                </Link>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+                      return (
+                        <div 
+                          key={partido.id}
+                          className={`bg-white rounded-2xl border-2 transition-all shadow-sm hover:shadow-md overflow-hidden ${
+                            esEnCurso
+                              ? 'border-green-500 bg-green-50/20 shadow-green-100'
+                              : esSuspendido
+                                ? 'border-yellow-400 bg-yellow-50/30'
+                                : esFinalizado
+                                  ? 'border-gray-200 bg-gray-50/60 opacity-90'
+                                  : 'border-gray-200 hover:border-blue-300'
+                          }`}
+                        >
+                          {/* Barra superior de información */}
+                          <div className="bg-gray-50/90 px-4 py-2 border-b border-gray-200 flex flex-wrap justify-between items-center gap-2">
+                            <div className="flex items-center gap-2">
+                              <span className="font-black text-blue-700 text-xs md:text-sm tracking-wide flex items-center gap-1">
+                                ⏱️ {formatearHora(partido.hora)}
+                              </span>
+                              <span className="text-gray-300">|</span>
+                              <span className="bg-blue-100 text-blue-800 text-[10px] md:text-xs font-black px-2 py-0.5 rounded-full uppercase">
+                                {partido.categoria}
+                              </span>
+                              <span className="text-gray-500 text-[10px] md:text-xs font-semibold">
+                                {partido.fase_torneo}
+                              </span>
+                            </div>
+
+                            {/* Badge de Estado */}
+                            <div>
+                              {esEnCurso && (
+                                <span className="bg-green-600 text-white font-black text-[10px] uppercase px-3 py-0.5 rounded-full animate-pulse flex items-center gap-1 shadow-sm">
+                                  🔴 EN VIVO
+                                </span>
+                              )}
+                              {esSuspendido && (
+                                <span className="bg-yellow-500 text-gray-900 font-black text-[10px] uppercase px-3 py-0.5 rounded-full shadow-sm">
+                                  ⏸️ SUSPENDIDO
+                                </span>
+                              )}
+                              {esFinalizado && (
+                                <span className="bg-gray-200 text-gray-700 font-black text-[10px] uppercase px-3 py-0.5 rounded-full">
+                                  FINALIZADO
+                                </span>
+                              )}
+                              {partido.estado === 'programado' && (
+                                <span className="bg-blue-50 text-blue-700 border border-blue-200 font-bold text-[10px] uppercase px-2.5 py-0.5 rounded-full">
+                                  PROGRAMADO
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Cuerpo del Partido: Equipos, Marcador y Botón */}
+                          <div className="p-4 md:p-6 flex flex-col md:flex-row items-center justify-between gap-4">
+                            
+                            {/* Enfrentamiento de Equipos */}
+                            <div className="flex items-center justify-between md:justify-start w-full md:w-2/3 gap-3 md:gap-6">
+                              
+                              {/* Equipo Local */}
+                              <div className="flex items-center gap-3 w-[42%] md:w-auto flex-1 justify-end md:justify-start">
+                                <div className="text-right md:text-left flex-1 min-w-0">
+                                  <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest block">Local</span>
+                                  <span className="font-black text-gray-900 text-sm md:text-lg uppercase leading-tight line-clamp-2">
+                                    {partido.local?.nombre || 'Local'}
+                                  </span>
+                                </div>
+                                <div className="w-10 h-10 md:w-12 md:h-12 bg-white rounded-full flex items-center justify-center border border-gray-200 shadow-sm shrink-0 overflow-hidden">
+                                  {partido.local?.logo_url ? (
+                                    <img src={partido.local.logo_url} alt={partido.local.nombre} className="w-full h-full object-contain p-1" />
+                                  ) : (
+                                    <span className="text-gray-400 font-black text-base">{partido.local?.nombre?.charAt(0) || 'L'}</span>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Marcador / VS */}
+                              <div className="flex flex-col items-center justify-center shrink-0 px-2 min-w-[70px]">
+                                {esFinalizado || esEnCurso || esSuspendido ? (
+                                  <div className="flex items-center gap-1.5 font-black text-lg md:text-2xl text-gray-900">
+                                    <span className={partido.puntos_local > partido.puntos_visitante ? "text-blue-600" : ""}>
+                                      {partido.puntos_local ?? 0}
+                                    </span>
+                                    <span className="text-gray-400 text-sm">-</span>
+                                    <span className={partido.puntos_visitante > partido.puntos_local ? "text-blue-600" : ""}>
+                                      {partido.puntos_visitante ?? 0}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <span className="font-black text-xs md:text-sm text-gray-400 bg-gray-100 px-2.5 py-1 rounded-full">
+                                    VS
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Equipo Visitante */}
+                              <div className="flex items-center gap-3 w-[42%] md:w-auto flex-1">
+                                <div className="w-10 h-10 md:w-12 md:h-12 bg-white rounded-full flex items-center justify-center border border-gray-200 shadow-sm shrink-0 overflow-hidden">
+                                  {partido.visitante?.logo_url ? (
+                                    <img src={partido.visitante.logo_url} alt={partido.visitante.nombre} className="w-full h-full object-contain p-1" />
+                                  ) : (
+                                    <span className="text-gray-400 font-black text-base">{partido.visitante?.nombre?.charAt(0) || 'V'}</span>
+                                  )}
+                                </div>
+                                <div className="text-left flex-1 min-w-0">
+                                  <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest block">Visita</span>
+                                  <span className="font-black text-gray-900 text-sm md:text-lg uppercase leading-tight line-clamp-2">
+                                    {partido.visitante?.nombre || 'Visitante'}
+                                  </span>
+                                </div>
+                              </div>
+
+                            </div>
+
+                            {/* Botón de Acción a la Mesa */}
+                            <div className="w-full md:w-auto shrink-0 flex justify-end">
+                              <Link
+                                href={`/mesa-tecnica/${partido.id}`}
+                                className={`w-full md:w-auto px-6 py-3 rounded-xl font-black uppercase tracking-wider text-xs transition-all text-center shadow-md flex items-center justify-center gap-2 ${
+                                  esEnCurso
+                                    ? 'bg-green-600 hover:bg-green-700 text-white animate-pulse'
+                                    : esSuspendido
+                                      ? 'bg-yellow-500 hover:bg-yellow-600 text-gray-900'
+                                      : esFinalizado
+                                        ? 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+                                        : 'bg-gray-900 hover:bg-blue-600 text-white'
+                                }`}
+                              >
+                                {esEnCurso ? '▶️ Continuar Anotando' : esSuspendido ? '⏸️ Reanudar / Mesa' : esFinalizado ? 'Ver / Editar' : '🏀 Abrir Pizarra'}
+                              </Link>
+                            </div>
+
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                </div>
+              ))}
+
+            </div>
+          ))}
+        </div>
+      )}
     </main>
   );
 }

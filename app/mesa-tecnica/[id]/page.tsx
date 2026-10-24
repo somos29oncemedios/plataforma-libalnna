@@ -11,6 +11,12 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
   const [cargando, setCargando] = useState(true);
   const [editandoDespuesDeFinalizar, setEditandoDespuesDeFinalizar] = useState(false);
 
+  // 🏀 ESTADOS PARA EDICIÓN DIRECTA DEL MARCADOR POR TECLADO
+  const [editandoScoreLocal, setEditandoScoreLocal] = useState(false);
+  const [tempScoreLocal, setTempScoreLocal] = useState('');
+  const [editandoScoreVis, setEditandoScoreVis] = useState(false);
+  const [tempScoreVis, setTempScoreVis] = useState('');
+
   // 🏀 ROSTERS COMPLETOS DEL PARTIDO
   const [rosterLocalCompleto, setRosterLocalCompleto] = useState<any[]>([]);
   const [rosterVisitanteCompleto, setRosterVisitanteCompleto] = useState<any[]>([]);
@@ -384,6 +390,82 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
     if (!error) setPartido({ ...partido, [campo]: nuevoValor, puntos_local: finalSLocal, puntos_visitante: finalSVis });
   };
 
+  // ⌨️ TECLEAR EL SCORE MANUALMENTE
+  const guardarScoreTeclado = async (equipo: 'local' | 'visitante', valorStr: string) => {
+    if (partidoBloqueado) return;
+    const valorNum = parseInt(valorStr, 10);
+    if (isNaN(valorNum) || valorNum < 0) {
+      if (equipo === 'local') setEditandoScoreLocal(false);
+      else setEditandoScoreVis(false);
+      return;
+    }
+
+    const finalScore = Math.max(0, valorNum);
+
+    if (equipo === 'local') {
+      const nuevoManual = finalScore - scoreJugadoresLocal;
+      const finalVis = scoreVisitante;
+      
+      const { error } = await supabase
+        .from('partidos')
+        .update({ 
+          score_manual_local: nuevoManual, 
+          puntos_local: finalScore, 
+          puntos_visitante: finalVis 
+        })
+        .eq('id', id);
+
+      if (!error) {
+        setPartido((prev: any) => ({ 
+          ...prev, 
+          score_manual_local: nuevoManual, 
+          puntos_local: finalScore, 
+          puntos_visitante: finalVis 
+        }));
+      } else {
+        alert(`❌ Error actualizando marcador local: ${error.message}`);
+      }
+      setEditandoScoreLocal(false);
+    } else {
+      const nuevoManual = finalScore - scoreJugadoresVisitante;
+      const finalLocal = scoreLocal;
+
+      const { error } = await supabase
+        .from('partidos')
+        .update({ 
+          score_manual_visitante: nuevoManual, 
+          puntos_local: finalLocal, 
+          puntos_visitante: finalScore 
+        })
+        .eq('id', id);
+
+      if (!error) {
+        setPartido((prev: any) => ({ 
+          ...prev, 
+          score_manual_visitante: nuevoManual, 
+          puntos_local: finalLocal, 
+          puntos_visitante: finalScore 
+        }));
+      } else {
+        alert(`❌ Error actualizando marcador visitante: ${error.message}`);
+      }
+      setEditandoScoreVis(false);
+    }
+  };
+
+  const omitirQuintetos = async () => {
+    setCanchaLocal([]);
+    setBancaLocal(rosterLocalCompleto);
+    setCanchaVisitante([]);
+    setBancaVisitante(rosterVisitanteCompleto);
+    setSeleccionInicial(false);
+
+    if (partido?.estado === 'programado') {
+      await supabase.from('partidos').update({ estado: 'en curso' }).eq('id', id);
+      setPartido((prev: any) => ({ ...prev, estado: 'en curso' }));
+    }
+  };
+
   const sincronizarPuntosGlobales = async (currentStats: any, manualLocal: number, manualVis: number) => {
     let sLocal = 0; let sVis = 0;
     Object.values(currentStats).forEach((stat: any) => {
@@ -706,6 +788,15 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
               Confirmar e Ir a la Cancha 🏀
             </button>
 
+            {/* Opción rápida: Anotar sin quintetos obligatorios */}
+            <button
+              type="button"
+              onClick={omitirQuintetos}
+              className="text-blue-600 hover:text-blue-800 text-xs font-black uppercase tracking-wider underline transition-colors"
+            >
+              ⏩ Anotar Marcador Directo (Omitir Quintetos)
+            </button>
+
             {/* 🔥 BOTONES DE SUSPENSIÓN Y REANUDACIÓN EN FASE 0 */}
             {partido?.estado === 'suspendido' ? (
               <button 
@@ -783,6 +874,27 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
 
   return (
     <main className="container mx-auto py-1 px-1 max-w-[1400px]">
+      {/* BANNER PARA PARTIDO FINALIZADO CON OPCIÓN DE HABILITAR CORRECCIÓN */}
+      {partido?.estado === 'finalizado' && (
+        <div className="bg-gray-800 border-2 border-yellow-500/60 rounded-xl p-2.5 mb-1.5 flex flex-col sm:flex-row justify-between items-center gap-2 text-white shadow-md">
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-base">🏁</span>
+            <span>
+              Partido <strong>FINALIZADO</strong>. Marcador oficial: <strong className="text-yellow-400">{scoreLocal} - {scoreVisitante}</strong>.
+            </span>
+          </div>
+          <button
+            onClick={() => setEditandoDespuesDeFinalizar(!editandoDespuesDeFinalizar)}
+            className={`px-3.5 py-1 rounded-lg text-xs font-black uppercase tracking-wide transition-all shadow ${
+              editandoDespuesDeFinalizar
+                ? 'bg-yellow-500 text-gray-900 hover:bg-yellow-600'
+                : 'bg-blue-600 text-white hover:bg-blue-700'
+            }`}
+          >
+            {editandoDespuesDeFinalizar ? '🔒 Bloquear Marcador' : '✏️ Habilitar Corrección Manual'}
+          </button>
+        </div>
+      )}
       {/* MARCADOR GLOBAL EN VIVO */}
       <div className="bg-gray-900 rounded-xl p-2 mb-1.5 shadow-xl text-white flex flex-col md:flex-row justify-between items-center gap-1.5 relative">
         
@@ -805,24 +917,75 @@ export default function MesaTecnicaPartido({ params }: { params: Promise<{ id: s
             
             <div className="flex items-center gap-1.5">
               <div className="flex flex-col gap-0.5">
-                <button onClick={() => ajustarScoreManual('local', 'sumar')} className="w-5 h-5 flex items-center justify-center bg-gray-700 hover:bg-gray-600 text-green-400 rounded text-[10px] font-black transition-colors" title="Sumar punto global local">+</button>
-                <button onClick={() => ajustarScoreManual('local', 'restar')} className="w-5 h-5 flex items-center justify-center bg-gray-700 hover:bg-gray-600 text-red-400 rounded text-[10px] font-black transition-colors" title="Restar punto global local">-</button>
+                <button onClick={() => ajustarScoreManual('local', 'sumar')} disabled={partidoBloqueado} className="w-5 h-5 flex items-center justify-center bg-gray-700 hover:bg-gray-600 disabled:opacity-30 text-green-400 rounded text-[10px] font-black transition-colors" title="Sumar punto global local">+</button>
+                <button onClick={() => ajustarScoreManual('local', 'restar')} disabled={partidoBloqueado} className="w-5 h-5 flex items-center justify-center bg-gray-700 hover:bg-gray-600 disabled:opacity-30 text-red-400 rounded text-[10px] font-black transition-colors" title="Restar punto global local">-</button>
               </div>
-              <span className={`text-xl md:text-3xl font-black w-8 md:w-12 text-center leading-none ${partido?.estado === 'suspendido' ? 'text-yellow-600' : 'text-yellow-400'}`}>{scoreLocal}</span>
+              <input
+                type="number"
+                min="0"
+                max="999"
+                disabled={partidoBloqueado}
+                value={editandoScoreLocal ? tempScoreLocal : scoreLocal}
+                onFocus={() => {
+                  setEditandoScoreLocal(true);
+                  setTempScoreLocal(scoreLocal.toString());
+                }}
+                onChange={(e) => setTempScoreLocal(e.target.value)}
+                onBlur={() => guardarScoreTeclado('local', tempScoreLocal)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    (e.target as HTMLInputElement).blur();
+                  }
+                }}
+                className={`w-14 sm:w-16 md:w-20 text-center font-black text-xl md:text-3xl rounded-lg border leading-none py-1 transition-all outline-none selection:bg-yellow-400 selection:text-black ${
+                  partidoBloqueado 
+                    ? 'bg-transparent border-transparent text-yellow-400 cursor-default' 
+                    : 'bg-gray-950/90 border-gray-600 hover:border-yellow-400 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/50 text-yellow-400 cursor-text'
+                } ${partido?.estado === 'suspendido' ? 'text-yellow-600' : ''}`}
+                title={partidoBloqueado ? '' : 'Haz clic para teclear el marcador local directamente'}
+              />
             </div>
 
             <span className="text-sm md:text-base text-gray-500 font-black">-</span>
 
             <div className="flex items-center gap-1.5">
-              <span className={`text-xl md:text-3xl font-black w-8 md:w-12 text-center leading-none ${partido?.estado === 'suspendido' ? 'text-yellow-600' : 'text-yellow-400'}`}>{scoreVisitante}</span>
+              <input
+                type="number"
+                min="0"
+                max="999"
+                disabled={partidoBloqueado}
+                value={editandoScoreVis ? tempScoreVis : scoreVisitante}
+                onFocus={() => {
+                  setEditandoScoreVis(true);
+                  setTempScoreVis(scoreVisitante.toString());
+                }}
+                onChange={(e) => setTempScoreVis(e.target.value)}
+                onBlur={() => guardarScoreTeclado('visitante', tempScoreVis)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    (e.target as HTMLInputElement).blur();
+                  }
+                }}
+                className={`w-14 sm:w-16 md:w-20 text-center font-black text-xl md:text-3xl rounded-lg border leading-none py-1 transition-all outline-none selection:bg-yellow-400 selection:text-black ${
+                  partidoBloqueado 
+                    ? 'bg-transparent border-transparent text-yellow-400 cursor-default' 
+                    : 'bg-gray-950/90 border-gray-600 hover:border-yellow-400 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/50 text-yellow-400 cursor-text'
+                } ${partido?.estado === 'suspendido' ? 'text-yellow-600' : ''}`}
+                title={partidoBloqueado ? '' : 'Haz clic para teclear el marcador visitante directamente'}
+              />
               <div className="flex flex-col gap-0.5">
-                <button onClick={() => ajustarScoreManual('visitante', 'sumar')} className="w-5 h-5 flex items-center justify-center bg-gray-700 hover:bg-gray-600 text-green-400 rounded text-[10px] font-black transition-colors" title="Sumar punto global visitante">+</button>
-                <button onClick={() => ajustarScoreManual('visitante', 'restar')} className="w-5 h-5 flex items-center justify-center bg-gray-700 hover:bg-gray-600 text-red-400 rounded text-[10px] font-black transition-colors" title="Restar punto global visitante">-</button>
+                <button onClick={() => ajustarScoreManual('visitante', 'sumar')} disabled={partidoBloqueado} className="w-5 h-5 flex items-center justify-center bg-gray-700 hover:bg-gray-600 disabled:opacity-30 text-green-400 rounded text-[10px] font-black transition-colors" title="Sumar punto global visitante">+</button>
+                <button onClick={() => ajustarScoreManual('visitante', 'restar')} disabled={partidoBloqueado} className="w-5 h-5 flex items-center justify-center bg-gray-700 hover:bg-gray-600 disabled:opacity-30 text-red-400 rounded text-[10px] font-black transition-colors" title="Restar punto global visitante">-</button>
               </div>
             </div>
 
           </div>
           
+          {!partidoBloqueado && (
+            <span className="text-[8px] text-gray-400 font-bold mb-1">
+              ⌨️ Toca los números para teclear
+            </span>
+          )}
           <div className="flex items-center gap-1 bg-gray-900/80 p-0.5 rounded-lg border border-gray-700">
             {['1Q', '2Q', '3Q', '4Q', 'Extra'].map(q => (
               <button
