@@ -30,6 +30,7 @@ export default function GeneradorGraficas() {
   const [fondoPosiciones, setFondoPosiciones] = useState<string>('dark_premium');
   const [tituloFase, setTituloFase] = useState('TEMPORADA REGULAR 2026-2');
   const [limiteClasificados, setLimiteClasificados] = useState<number>(obtenerLimiteClasificados(CATEGORIAS[1]));
+  const [soloClasificados, setSoloClasificados] = useState(true);
   const [tablaPosiciones, setTablaPosiciones] = useState<any[]>([]);
   const [cargandoPosiciones, setCargandoPosiciones] = useState(false);
   const [partePosiciones, setPartePosiciones] = useState<1 | 2>(1);
@@ -44,7 +45,11 @@ export default function GeneradorGraficas() {
   useEffect(() => {
     if (modo === 'posiciones') {
       cargarPosiciones(categoriaPosiciones);
-      setLimiteClasificados(obtenerLimiteClasificados(categoriaPosiciones));
+      const limite = obtenerLimiteClasificados(categoriaPosiciones);
+      setLimiteClasificados(limite);
+      if (categoriaPosiciones === 'U10' || limite > 0) {
+        setSoloClasificados(true);
+      }
     }
   }, [modo, categoriaPosiciones]);
 
@@ -258,8 +263,14 @@ export default function GeneradorGraficas() {
 
   // Lógica de detección y particionado de Tabla de Posiciones
   const esStory = formatoPosiciones === '1080x1920';
-  const limiteEquiposPorImagen = esStory ? 10 : 7;
-  const detectaExcesoEquipos = tablaPosiciones.length > limiteEquiposPorImagen;
+  const limiteEquiposPorImagen = esStory ? 10 : 8;
+
+  // Si soloClasificados está activo y la categoría tiene zona definida, se filtran estrictamente los clasificados
+  const equiposBase = (soloClasificados && limiteClasificados > 0)
+    ? tablaPosiciones.slice(0, limiteClasificados)
+    : tablaPosiciones;
+
+  const detectaExcesoEquipos = equiposBase.length > limiteEquiposPorImagen;
   const esModoDosPartes = modoDivision === 'forzar_2' 
     ? true 
     : modoDivision === 'forzar_1' 
@@ -267,16 +278,14 @@ export default function GeneradorGraficas() {
       : detectaExcesoEquipos;
 
   const calcularCorteOptimo = () => {
-    if (cortePersonalizado !== null && cortePersonalizado > 0 && cortePersonalizado < tablaPosiciones.length) {
+    if (cortePersonalizado !== null && cortePersonalizado > 0 && cortePersonalizado < equiposBase.length) {
       return cortePersonalizado;
     }
-    const total = tablaPosiciones.length;
+    const total = equiposBase.length;
+    // Si la categoría tiene zona de clasificados definida (ej: 8 en U10/U12/U14, 4 en U16/U18)
+    // El corte de la Parte 1 debe ser EXACTAMENTE el límite de clasificados.
     if (limiteClasificados > 0 && limiteClasificados < total) {
-      const restantes = total - limiteClasificados;
-      // Si ambos lados caben en la capacidad máxima de la imagen:
-      if (limiteClasificados <= (esStory ? 10 : 8) && restantes <= (esStory ? 10 : 8)) {
-        return limiteClasificados;
-      }
+      return limiteClasificados;
     }
     return Math.ceil(total / 2);
   };
@@ -284,8 +293,8 @@ export default function GeneradorGraficas() {
   const corteParte1 = calcularCorteOptimo();
 
   const equiposAMostrar = esModoDosPartes
-    ? (partePosiciones === 1 ? tablaPosiciones.slice(0, corteParte1) : tablaPosiciones.slice(corteParte1))
-    : (esStory ? tablaPosiciones.slice(0, 10) : tablaPosiciones.slice(0, 7));
+    ? (partePosiciones === 1 ? equiposBase.slice(0, corteParte1) : equiposBase.slice(corteParte1))
+    : equiposBase.slice(0, limiteEquiposPorImagen);
 
   const offsetPosicion = (esModoDosPartes && partePosiciones === 2) ? corteParte1 : 0;
 
@@ -593,8 +602,28 @@ export default function GeneradorGraficas() {
                   </select>
                 </div>
 
+                {/* Filtro: Mostrar Solo Clasificados vs Todos los Equipos */}
+                {limiteClasificados > 0 && (
+                  <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-3">
+                    <label className="flex items-center gap-2.5 cursor-pointer font-black text-xs text-blue-900 uppercase">
+                      <input 
+                        type="checkbox" 
+                        checked={soloClasificados}
+                        onChange={(e) => setSoloClasificados(e.target.checked)}
+                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 accent-blue-600"
+                      />
+                      <span>Mostrar solo los {limiteClasificados} clasificados</span>
+                    </label>
+                    <p className="text-[11px] text-blue-700 mt-1 font-semibold leading-tight">
+                      {soloClasificados 
+                        ? `Activo: Muestra únicamente los ${limiteClasificados} clasificados en 1 sola imagen.`
+                        : `Inactivo: Muestra todos los ${tablaPosiciones.length} equipos divididos en partes.`}
+                    </p>
+                  </div>
+                )}
+
                 {/* DETECCIÓN Y CONTROL DE DIVISIÓN EN 2 IMÁGENES */}
-                {tablaPosiciones.length > 0 && (
+                {equiposBase.length > 0 && (
                   <div className="flex flex-col gap-3 mt-1 border-t border-gray-200 pt-3">
                     {detectaExcesoEquipos ? (
                       <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-3.5 text-amber-950 shadow-sm">
@@ -603,7 +632,7 @@ export default function GeneradorGraficas() {
                           <span>Detección Automática: 2 Imágenes</span>
                         </div>
                         <p className="text-[11px] text-amber-800 mt-1 font-semibold leading-relaxed">
-                          Esta categoría cuenta con <span className="font-black text-amber-950">{tablaPosiciones.length} equipos</span> (el límite ideal en {esStory ? 'Historia' : 'Feed'} es {limiteEquiposPorImagen}). 
+                          Esta lista cuenta con <span className="font-black text-amber-950">{equiposBase.length} equipos</span> (el límite ideal en {esStory ? 'Historia' : 'Feed'} es {limiteEquiposPorImagen}). 
                           Se divide automáticamente en <strong>2 imágenes</strong> para que todos los clubes, logos y estadísticas se vean con máxima nitidez.
                         </p>
                       </div>
@@ -611,7 +640,7 @@ export default function GeneradorGraficas() {
                       <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 text-emerald-800 text-[11px] font-bold flex items-center justify-between">
                         <span className="flex items-center gap-1.5">
                           <span>✅</span>
-                          <span>Cabe en 1 sola imagen ({tablaPosiciones.length} de máx. {limiteEquiposPorImagen} equipos).</span>
+                          <span>{soloClasificados ? `Mostrando solo los ${limiteClasificados} clasificados en 1 imagen.` : `Cabe en 1 sola imagen (${equiposBase.length} de máx. ${limiteEquiposPorImagen} equipos).`}</span>
                         </span>
                       </div>
                     )}
@@ -672,7 +701,7 @@ export default function GeneradorGraficas() {
                 <div className="mt-1 p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-600 font-bold flex justify-between items-center">
                   <span>Equipos cargados:</span>
                   <span className="text-blue-600 font-black text-sm">
-                    {tablaPosiciones.length} {esModoDosPartes ? `(Mostrando ${equiposAMostrar.length} en Parte ${partePosiciones})` : ''}
+                    {tablaPosiciones.length} {soloClasificados ? `(Mostrando solo ${equiposAMostrar.length} clasificados)` : esModoDosPartes ? `(Mostrando ${equiposAMostrar.length} en Parte ${partePosiciones})` : ''}
                   </span>
                 </div>
 
@@ -879,8 +908,14 @@ export default function GeneradorGraficas() {
                     </span>
                   </div>
 
-                  {/* Indicador de Parte 1 / Parte 2 cuando aplica */}
-                  {esModoDosPartes && (
+                  {/* Indicador de Clasificados o Parte 1 / Parte 2 */}
+                  {soloClasificados && limiteClasificados > 0 ? (
+                    <div className="mt-2.5 bg-yellow-500/15 backdrop-blur-md px-6 py-1.5 rounded-full border border-yellow-400/30 shadow-lg flex items-center gap-2">
+                      <span className="text-yellow-400 font-black text-[18px] uppercase tracking-wider">
+                        ⭐ ZONA DE CLASIFICACIÓN • PUESTOS 1 AL {limiteClasificados}
+                      </span>
+                    </div>
+                  ) : esModoDosPartes ? (
                     <div className="mt-2.5 bg-white/10 backdrop-blur-md px-6 py-1.5 rounded-full border border-white/20 shadow-lg flex items-center gap-3">
                       <span className="text-yellow-400 font-black text-[19px] uppercase tracking-wider">
                         PARTE {partePosiciones} DE 2
@@ -890,7 +925,7 @@ export default function GeneradorGraficas() {
                         PUESTOS {partePosiciones === 1 ? `1 AL ${corteParte1}` : `${corteParte1 + 1} AL ${tablaPosiciones.length}`}
                       </span>
                     </div>
-                  )}
+                  ) : null}
 
                 </div>
 
