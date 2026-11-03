@@ -300,11 +300,11 @@ export default function GeneradorGraficas() {
 
   const numEquiposMostrados = equiposAMostrar.length;
   const rowHeightClass = esStory 
-    ? (numEquiposMostrados >= 10 ? 'h-[88px]' : 'h-[96px]')
-    : (numEquiposMostrados >= 8 ? 'h-[78px]' : 'h-[86px]');
+    ? (numEquiposMostrados >= 10 ? 'h-[88px]' : numEquiposMostrados >= 7 ? 'h-[96px]' : 'h-[102px]')
+    : (numEquiposMostrados >= 8 ? 'h-[78px]' : numEquiposMostrados >= 6 ? 'h-[86px]' : 'h-[90px]');
   const rowGapClass = esStory
-    ? (numEquiposMostrados >= 10 ? 'gap-2.5' : 'gap-3.5')
-    : (numEquiposMostrados >= 8 ? 'gap-2' : 'gap-2.5');
+    ? (numEquiposMostrados >= 10 ? 'gap-2.5' : numEquiposMostrados >= 7 ? 'gap-3.5' : 'gap-4')
+    : (numEquiposMostrados >= 8 ? 'gap-2' : numEquiposMostrados >= 6 ? 'gap-2.5' : 'gap-3');
 
   const descargarImagenPosiciones = async (parteForzada?: number) => {
     if (graficaPosicionesRef.current === null) return;
@@ -930,7 +930,7 @@ export default function GeneradorGraficas() {
                 </div>
 
                 {/* 2. TABLA RESUMIDA (ÁREA CENTRAL) */}
-                <div className={`w-full px-16 flex-1 flex flex-col justify-center relative z-10 ${esStory ? 'my-2' : 'my-1'}`}>
+                <div className={`w-full px-16 flex-1 flex flex-col justify-start relative z-10 ${esStory ? 'mt-4' : 'mt-2'}`}>
                   
                   {/* Encabezados de Columna */}
                   <div className="w-full flex items-center px-6 py-2.5 mb-3 text-white/80 font-black text-[22px] uppercase tracking-wider border-b-2 border-white/20">
