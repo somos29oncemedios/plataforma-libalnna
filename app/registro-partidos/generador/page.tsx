@@ -839,31 +839,30 @@ export default function GeneradorGraficas() {
                 )}
 
                 {/* 1. ENCABEZADO DE LA GRÁFICA */}
-                <div className={`w-full px-16 ${esStory ? 'pt-20 pb-8' : 'pt-14 pb-6'} flex flex-col items-center relative z-10`}>
+                <div className={`w-full px-16 ${esStory ? 'pt-28 pb-6' : 'pt-16 pb-4'} flex flex-col items-center relative z-10`}>
                   
-                  {/* Barra superior con Logos oficiales */}
-                  <div className="w-full flex justify-between items-center mb-6">
-                    <div className="w-24 h-24 bg-white/95 rounded-2xl p-2 shadow-lg flex items-center justify-center border-2 border-white/40">
-                      <img src="/logo-libalnna.png" alt="Libalnna" className="w-full h-full object-contain" />
-                    </div>
-                    <div className="flex flex-col items-center">
-                      <span className="text-yellow-400 font-black text-[18px] tracking-[0.3em] uppercase drop-shadow-md">
+                  {/* Logo Principal Oficial Libalnna como Cabeza de la Imagen */}
+                  <div className="flex flex-col items-center">
+                    <img 
+                      src="/logo-libalnna-header.png" 
+                      alt="LIBALNNA - Todos Juegan, Todos Crecen" 
+                      className={`${esStory ? 'h-[145px]' : 'h-[105px]'} w-auto object-contain drop-shadow-2xl`}
+                    />
+                    <div className="flex flex-col items-center mt-3 mb-2">
+                      <span className="text-yellow-400 font-black text-[18px] tracking-[0.35em] uppercase drop-shadow-md">
                         {tituloFase}
                       </span>
-                      <span className="text-white/60 font-bold text-[14px] uppercase tracking-widest mt-0.5">
+                      <span className="text-white/70 font-bold text-[13px] uppercase tracking-widest mt-0.5">
                         LIGA DE BALONCESTO DE MENORES
                       </span>
-                    </div>
-                    <div className="w-24 h-24 bg-white/95 rounded-2xl p-2 shadow-lg flex items-center justify-center border-2 border-white/40">
-                      <img src="/logo-29once.png" alt="29Once" className="w-full h-full object-contain" />
                     </div>
                   </div>
 
                   {/* Título Principal */}
                   <h1 
-                    className="text-white font-black uppercase tracking-tight text-center leading-none drop-shadow-xl"
+                    className="text-white font-black uppercase tracking-tight text-center leading-none drop-shadow-xl mt-1"
                     style={{ 
-                      fontSize: esStory ? '72px' : '62px',
+                      fontSize: esStory ? '70px' : '58px',
                       fontFamily: '"Oswald", sans-serif'
                     }}
                   >
@@ -871,10 +870,10 @@ export default function GeneradorGraficas() {
                   </h1>
 
                   {/* Badge de Categoría */}
-                  <div className="mt-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white font-black px-10 py-2.5 rounded-full shadow-xl border-2 border-white/30 flex items-center gap-3">
+                  <div className="mt-3.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white font-black px-9 py-2 rounded-full shadow-xl border-2 border-white/30 flex items-center gap-3">
                     <span className="text-yellow-400 text-2xl">🏀</span>
                     <span 
-                      className="text-[34px] tracking-widest uppercase"
+                      className={`${esStory ? 'text-[32px]' : 'text-[28px]'} tracking-widest uppercase`}
                       style={{ fontFamily: '"Montserrat", sans-serif' }}
                     >
                       CATEGORÍA {categoriaPosiciones}
@@ -883,12 +882,12 @@ export default function GeneradorGraficas() {
 
                   {/* Indicador de Parte 1 / Parte 2 cuando aplica */}
                   {esModoDosPartes && (
-                    <div className="mt-3 bg-white/10 backdrop-blur-md px-6 py-1.5 rounded-full border border-white/20 shadow-lg flex items-center gap-3">
-                      <span className="text-yellow-400 font-black text-[20px] uppercase tracking-wider">
+                    <div className="mt-2.5 bg-white/10 backdrop-blur-md px-6 py-1.5 rounded-full border border-white/20 shadow-lg flex items-center gap-3">
+                      <span className="text-yellow-400 font-black text-[19px] uppercase tracking-wider">
                         PARTE {partePosiciones} DE 2
                       </span>
                       <span className="text-white/40">•</span>
-                      <span className="text-white font-bold text-[18px] uppercase tracking-wide">
+                      <span className="text-white font-bold text-[17px] uppercase tracking-wide">
                         PUESTOS {partePosiciones === 1 ? `1 AL ${corteParte1}` : `${corteParte1 + 1} AL ${tablaPosiciones.length}`}
                       </span>
                     </div>
@@ -897,7 +896,7 @@ export default function GeneradorGraficas() {
                 </div>
 
                 {/* 2. TABLA RESUMIDA (ÁREA CENTRAL) */}
-                <div className={`w-full px-16 flex-1 flex flex-col justify-start relative z-10 ${esStory ? 'mt-2' : 'mt-0'}`}>
+                <div className={`w-full px-16 flex-1 flex flex-col justify-center relative z-10 ${esStory ? 'my-2' : 'my-1'}`}>
                   
                   {/* Encabezados de Columna */}
                   <div className="w-full flex items-center px-6 py-2.5 mb-3 text-white/80 font-black text-[22px] uppercase tracking-wider border-b-2 border-white/20">
@@ -1006,20 +1005,34 @@ export default function GeneradorGraficas() {
 
                 </div>
 
-                {/* 3. PIE DE PÁGINA (BRANDING) */}
-                <div className={`w-full px-16 ${esStory ? 'pb-16 pt-6' : 'pb-10 pt-4'} flex justify-between items-center relative z-10 border-t border-white/10 text-white/70`}>
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-[16px] uppercase tracking-wider">
+                {/* 3. PIE DE PÁGINA (BRANDING Y PATROCINADORES / ALIADOS) */}
+                <div className={`w-full px-16 ${esStory ? 'pb-28 pt-6' : 'pb-16 pt-5'} flex justify-between items-center relative z-10 border-t border-white/15 text-white/80`}>
+                  {/* Izquierda: 29Once */}
+                  <div className="flex items-center">
+                    <img 
+                      src="/logo-29once-white.png" 
+                      alt="29Once Medios" 
+                      className={`${esStory ? 'h-[52px]' : 'h-[40px]'} w-auto object-contain drop-shadow-[0_2px_10px_rgba(0,0,0,0.6)]`}
+                    />
+                  </div>
+
+                  {/* Centro: Info Oficial y Redes */}
+                  <div className="flex flex-col items-center text-center px-4">
+                    <span className="font-bold text-[15px] uppercase tracking-widest text-white/70">
                       Oficial • Libalnna 2026
                     </span>
-                  </div>
-                  <div className="text-right">
-                    <span className="font-black text-[16px] text-yellow-400 uppercase tracking-widest block">
+                    <span className="font-black text-[14px] text-yellow-400 uppercase tracking-widest mt-0.5 drop-shadow-sm">
                       @somos29oncemedios
                     </span>
-                    <span className="text-[12px] text-white/50 font-medium">
-                      www.libalnna.com
-                    </span>
+                  </div>
+
+                  {/* Derecha: Yesdan */}
+                  <div className="flex items-center">
+                    <img 
+                      src="/logo-yesdan-white.png" 
+                      alt="Yesdan" 
+                      className={`${esStory ? 'h-[52px]' : 'h-[40px]'} w-auto object-contain drop-shadow-[0_2px_10px_rgba(0,0,0,0.6)]`}
+                    />
                   </div>
                 </div>
 
