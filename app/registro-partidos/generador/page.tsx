@@ -1005,32 +1005,23 @@ export default function GeneradorGraficas() {
                 </div>
 
                 {/* 3. PIE DE PÁGINA (BRANDING Y PATROCINADORES / ALIADOS) */}
-                <div className={`w-full px-16 ${esStory ? 'pb-28 pt-6' : 'pb-16 pt-5'} flex justify-between items-center relative z-10 border-t border-white/15 text-white/80`}>
-                  {/* Izquierda: 29Once */}
-                  <div className="flex items-center">
+                <div className={`w-full px-16 ${esStory ? 'pb-28 pt-6' : 'pb-16 pt-5'} flex flex-col items-center justify-center relative z-10 border-t border-white/15`}>
+                  {/* Frase superior */}
+                  <span className="text-white/60 font-bold text-[14px] uppercase tracking-[0.25em] mb-3.5">
+                    Presentado por:
+                  </span>
+
+                  {/* Logos centrados */}
+                  <div className="flex items-center justify-center gap-12">
                     <img 
                       src="/logo-29once-white.png" 
                       alt="29Once Medios" 
-                      className={`${esStory ? 'h-[52px]' : 'h-[40px]'} w-auto object-contain drop-shadow-[0_2px_10px_rgba(0,0,0,0.6)]`}
+                      className={`${esStory ? 'h-[50px]' : 'h-[38px]'} w-auto object-contain drop-shadow-[0_2px_10px_rgba(0,0,0,0.6)]`}
                     />
-                  </div>
-
-                  {/* Centro: Info Oficial y Redes */}
-                  <div className="flex flex-col items-center text-center px-4">
-                    <span className="font-bold text-[15px] uppercase tracking-widest text-white/70">
-                      Oficial • Libalnna 2026
-                    </span>
-                    <span className="font-black text-[14px] text-yellow-400 uppercase tracking-widest mt-0.5 drop-shadow-sm">
-                      @somos29oncemedios
-                    </span>
-                  </div>
-
-                  {/* Derecha: Yesdan */}
-                  <div className="flex items-center">
                     <img 
                       src="/logo-yesdan-white.png" 
                       alt="Yesdan" 
-                      className={`${esStory ? 'h-[52px]' : 'h-[40px]'} w-auto object-contain drop-shadow-[0_2px_10px_rgba(0,0,0,0.6)]`}
+                      className={`${esStory ? 'h-[50px]' : 'h-[38px]'} w-auto object-contain drop-shadow-[0_2px_10px_rgba(0,0,0,0.6)]`}
                     />
                   </div>
                 </div>
