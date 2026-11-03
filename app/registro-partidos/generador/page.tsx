@@ -28,7 +28,7 @@ export default function GeneradorGraficas() {
   const [categoriaPosiciones, setCategoriaPosiciones] = useState(CATEGORIAS[1]); // Default U10
   const [formatoPosiciones, setFormatoPosiciones] = useState<'1080x1920' | '1080x1440'>('1080x1920');
   const [fondoPosiciones, setFondoPosiciones] = useState<string>('dark_premium');
-  const [tituloFase, setTituloFase] = useState('TEMPORADA REGULAR 2026');
+  const [tituloFase, setTituloFase] = useState('TEMPORADA REGULAR 2026-2');
   const [limiteClasificados, setLimiteClasificados] = useState<number>(obtenerLimiteClasificados(CATEGORIAS[1]));
   const [tablaPosiciones, setTablaPosiciones] = useState<any[]>([]);
   const [cargandoPosiciones, setCargandoPosiciones] = useState(false);
@@ -574,7 +574,7 @@ export default function GeneradorGraficas() {
                     className="w-full border-2 border-gray-300 focus:border-blue-500 rounded-xl p-2.5 font-bold text-sm outline-none uppercase"
                     value={tituloFase}
                     onChange={(e) => setTituloFase(e.target.value)}
-                    placeholder="Ej: TEMPORADA REGULAR 2026"
+                    placeholder="Ej: TEMPORADA REGULAR 2026-2"
                   />
                 </div>
 
@@ -848,14 +848,13 @@ export default function GeneradorGraficas() {
                       alt="LIBALNNA - Todos Juegan, Todos Crecen" 
                       className={`${esStory ? 'h-[145px]' : 'h-[105px]'} w-auto object-contain drop-shadow-2xl`}
                     />
-                    <div className="flex flex-col items-center mt-3 mb-2">
-                      <span className="text-yellow-400 font-black text-[18px] tracking-[0.35em] uppercase drop-shadow-md">
-                        {tituloFase}
-                      </span>
-                      <span className="text-white/70 font-bold text-[13px] uppercase tracking-widest mt-0.5">
-                        LIGA DE BALONCESTO DE MENORES
-                      </span>
-                    </div>
+                    {tituloFase && (
+                      <div className="flex flex-col items-center mt-3 mb-1">
+                        <span className="text-yellow-400 font-black text-[20px] tracking-[0.35em] uppercase drop-shadow-md">
+                          {tituloFase}
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Título Principal */}
